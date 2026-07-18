@@ -27,3 +27,5 @@ dist-ssr
 /*.zip
 /*.docx
 /*.mp4
+
+.env

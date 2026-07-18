@@ -3,16 +3,50 @@ import { useState } from 'react';
 import './Login.css'; 
 import Logo from '../../Assets/Logo.png';
 import { useNavigate } from 'react-router-dom';
+import { apiRequest, setToken, setRole } from '../../services/api';
+
+interface LoginResponse {
+  token?: string;
+  access_token?: string;
+  jwt?: string;
+  data?: {
+    rol_id?: number;
+  };
+}
 
 export default function Login() {
-  const [nombre, setNombre] = useState('');
+  const [emailOrAlias, setEmailOrAlias] = useState('');
   const [contrasena, setContrasena] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: { preventDefault: () => void; }) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login attempt:', { nombre, contrasena });
-    navigate('/dashboard');
+    setError(null);
+    setLoading(true);
+
+    try {
+      const data = await apiRequest<LoginResponse>('/api/empleados/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: emailOrAlias, password: contrasena }),
+      });
+
+      const token = data.token ?? data.access_token ?? data.jwt ?? '';
+      if (token) {
+        setToken(token);
+      }
+
+      if (typeof data.data?.rol_id === 'number') {
+        setRole(data.data.rol_id);
+      }
+
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Credenciales incorrectas.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -23,14 +57,20 @@ export default function Login() {
           <h1 className="login-title">BIENVENIDO</h1>
           
           <form className="login-form" onSubmit={handleSubmit}>
+            {error && (
+              <div className="login-error" style={{ color: 'red', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                {error}
+              </div>
+            )}
+
             <div className="input-group">
-              <label htmlFor="nombre">Nombre</label>
+              <label htmlFor="nombre">Correo o usuario</label>
               <input
                 type="text"
                 id="nombre"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                placeholder="Ingresa tu nombre"
+                value={emailOrAlias}
+                onChange={(e) => setEmailOrAlias(e.target.value)}
+                placeholder="Ingresa tu correo o usuario"
                 required
               />
             </div>
@@ -47,9 +87,8 @@ export default function Login() {
               />
             </div>
 
-
-            <button type="submit" className="login-button">
-              ACEPTAR
+            <button type="submit" className="login-button" disabled={loading}>
+              {loading ? 'CARGANDO...' : 'ACEPTAR'}
             </button>
           </form>
 

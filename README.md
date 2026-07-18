@@ -1,200 +1,369 @@
-  # Archivo Recolecta Web
+# Recolecta Web
 
-  # Aplicación web desarrollada con React 19 + TypeScript + Vite 7 para la gestión y validación de rutas de recolección.
+Frontend administrativo de Recolecta construido con React 19, TypeScript, Vite 7 y React Router. Permite iniciar sesion contra `API_recolecta`, navegar por secciones protegidas por rol y consumir endpoints administrativos de rutas, puntos, anomalías, camiones, rellenos sanitarios y empleados.
 
-  # Este proyecto permite visualizar estados de rutas, validaciones y gestión de información relacionada con el proceso de recolección.
+Este proyecto es independiente de `Mapa-Rec`. No importa archivos de `Mapa-Rec` ni comparte su configuracion. Ambos proyectos pueden apuntar al mismo backend, pero cada uno tiene su propio `.env`, servicios y Vite config.
 
+## Requisitos
 
-  # Introducción
+- Node.js 18 o superior
+- npm 9 o superior
+- Backend `API_recolecta` corriendo localmente o expuesto mediante URL accesible
 
-            Recolecta Web es una aplicación desarrollada con React 19 + TypeScript + Vite 7 que permite gestionar rutas de recolección, visualizar su estado en tiempo real y validar el cumplimiento de las actividades realizadas por los conductores.
+## Instalacion
 
-            El sistema está diseñado como una herramienta de apoyo operativo para el control y seguimiento de procesos de recolección.
+```bash
+npm install
+```
 
-# Características Principales
+## Configuracion de entorno
 
-                  Visualización del estado de rutas
+El proyecto mantiene dos archivos de entorno versionables:
 
-                  Gestión de anomalías
+```txt
+.env.example
+.env.development
+```
 
-                  Validación de recolección
+`.env.example` documenta desarrollo y produccion. `.env.development` se usa para desarrollo y pruebas con Vite.
 
-                  Registro de historial de acciones
+Si necesitas variables locales propias, crea un `.env` en la raiz del proyecto a partir del ejemplo:
 
-                  Panel de alertas
+```bash
+cp .env.example .env
+```
 
-                  Dashboard general
+Desarrollo recomendado:
 
-                  Sistema de navegación estructurado
+```env
+ALLOW_ALL_HOSTS=true
+ALLOWED_HOSTS=
+API_PROXY_TARGET=http://localhost:8081
+VITE_API_URL=
+VITE_API_PROXY_TARGET=
+```
 
-                  Preparado para integración con Google Maps
+Produccion:
 
-                  Arquitectura modular y escalable
+```env
+ALLOW_ALL_HOSTS=false
+ALLOWED_HOSTS=frontend.example.com,www.example.com
+API_PROXY_TARGET=http://localhost:8081
+VITE_API_URL=
+VITE_API_PROXY_TARGET=
+```
 
-# Arquitectura
+`ALLOWED_HOSTS` debe contener solo hosts separados por comas, sin `https://`, rutas ni diagonales finales.
 
-            El proyecto sigue una arquitectura SPA (Single Page Application) basada en componentes.
+Si el backend corre en `8080`:
 
-                  Tipo de Arquitectura
+```env
+VITE_API_URL=
+API_PROXY_TARGET=http://localhost:8080
+```
 
-                  Frontend desacoplado
+Si usas ngrok:
 
-                  Basado en componentes
+```env
+VITE_API_URL=
+API_PROXY_TARGET=https://TU-SUBDOMINIO.ngrok-free.app
+```
 
-                  Enrutamiento interno con React Router
+En desarrollo se recomienda dejar `VITE_API_URL` vacio. El frontend llama a `/api/...` y Vite reenvia esas peticiones al backend definido en `API_PROXY_TARGET`. Esto evita problemas CORS.
 
-                  Estructura modular por vistas (feature-based structure)
+El proxy conserva compatibilidad con variables anteriores. La prioridad es:
 
+```txt
+API_PROXY_TARGET -> VITE_API_PROXY_TARGET -> VITE_API_URL -> http://localhost:8081
+```
 
-  # Stack Tecnológico
-        Frontend
+Llamada directa, solo si la API permite CORS:
 
-        React 19.2.0
+```env
+VITE_API_URL=http://localhost:8081
+```
 
-        React DOM 19.2.0
+## Scripts
 
-        TypeScript 5.9.3
+```bash
+npm run dev
+npm run build
+npm run preview
+npm run lint
+```
 
-        Vite 7.2.4
+Los scripts usan explicitamente:
 
-        React Router DOM 7.12.0
+```txt
+vite.config.mjs
+```
 
-        React Icons 5.5.0
-
-        Google Maps JS API Loader 2.0.2 (no implementado)
-
-        Linting
-
-        ESLint 9.39.1
-
-        typescript-eslint 8.46.4
-
-  # Requisitos
-
-        Node.js >= 18
-
-        npm >= 9
-
-  # Instalación
-        #  Clonar repositorio
-        #  git clone https://github.com/Denzel-Santiago/RecolectaWeb.git
-        # entrar en la carpeta con : cd recolecta-web
-
-  # Instalar dependencias
-        # npm install
-
-  # Ejecutar el Proyecto 
-        npm run dev
-
-  # Estructura del proyecto 
-    recolecta-web/
-      │
-      ├── public/                    # Archivos estáticos públicos
-      │
-      ├── src/
-      │   │
-      │   ├── assets/                # Recursos (imágenes, íconos, etc.)
-      │   │
-      │   ├── components/
-      │   │   └── Navigation/
-      │   │       ├── Navbar.tsx
-      │   │       └── Navbar.css
-      │   │
-      │   ├── Pages/
-      │   │   ├── Alertas/
-      │   │   ├── Anomalias/
-      │   │   ├── Dashboard/
-      │   │   ├── EstadoRuta/
-      │   │   ├── Historial/
-      │   │   ├── Login/
-      │   │   ├── Mapa/
-      │   │   └── ValidacionRecoleccion/
-      │   │
-      │   ├── Router/
-      │   │   └── AppRouter.tsx
-      │   │
-      │   ├── App.tsx
-      │   ├── App.css
-      │   ├── index.css
-      │   └── main.tsx
-      │
-      ├── .gitignore
-      ├── eslint.config.js
-      ├── index.html
-      ├── package.json
-      ├── package-lock.json
-      └── README.md
-
-# Seguridad
-
-            Actualmente el proyecto:
-
-            No expone credenciales en el código
-
-            Permite configuración mediante variables de entorno
-
-            Está preparado para autenticación futura
-
-            No almacena datos sensibles en el frontend
-
-            Recomendaciones para producción:
-
-            Usar variables de entorno (.env)
-
-            No subir archivos .env al repositorio
-
-            Implementar autenticación con JWT o OAuth
-
-            Implementar HTTPS en despliegue
-      
-      
- # URLs del Sistema (Rutas Frontend)
-
-      Dependiendo de tu configuración en AppRouter.tsx, las rutas incluyen:
-
-            /login
-
-            /dashboard
-
-            /estado-ruta
-
-            /validacion-recoleccion
-
-            /anomalias
-
-            /alertas
-
-            /historial
-
-            /mapa
-
-      
-# Notas Adicionales
-
-            El sistema está pensado como una herramienta de gestión operativa.
-
-            La aplicación está estructurada para escalar fácilmente.
-
-            Está preparada para futura conexión con backend.
-
-            Se puede desplegar en:
-
-            Vercel
-
-            Netlify
-
-            Servidores Linux
-
-            Docker
-
-            Kubernetes
-
-            El proyecto está diseñado para:
-
-            Separar claramente vistas y componentes
-
-            Permitir integración con APIs externas
-
-            Facilitar mantenimiento por otros desarrolladores
-
-            Ser adaptable a entornos empresariales
+`vite.config.ts` se mantiene alineado, pero el archivo usado por `npm run dev`, `npm run build` y `npm run preview` es `vite.config.mjs`.
+
+## Configuracion Vite
+
+Archivo usado:
+
+```txt
+vite.config.mjs
+```
+
+Responsabilidades:
+
+- cargar `.env` con `loadEnv`
+- usar `API_PROXY_TARGET || VITE_API_PROXY_TARGET || VITE_API_URL || http://localhost:8081`
+- configurar proxy `/api`
+- permitir todos los hosts solo cuando `ALLOW_ALL_HOSTS=true`
+- restringir hosts en produccion usando `ALLOWED_HOSTS`
+- impedir que produccion arranque con `ALLOW_ALL_HOSTS=true` o sin hosts configurados
+- agregar `ngrok-skip-browser-warning: 1` cuando se usa ngrok
+
+Con esta configuracion, una llamada del frontend a:
+
+```txt
+/api/empleados/login
+```
+
+puede ser reenviada por Vite a:
+
+```txt
+http://localhost:8081/api/empleados/login
+```
+
+o al valor configurado en `API_PROXY_TARGET`.
+
+## Estructura principal
+
+```txt
+src/
+  App.tsx
+  main.tsx
+  Router/
+    AppRouter.tsx
+    Guards.tsx
+  services/
+    api.ts
+    auth.ts
+  components/
+    Navigation/
+      Navbar.tsx
+      Navbar.css
+  Pages/
+    Login/
+    Dashboard/
+    Historial/
+    Alertas/
+    Anomalias/
+    EstadoRuta/
+    ValidacionRecoleccion/
+    Administracion/
+      RellenosSanitarios/
+      Camiones/
+      DiasRecoleccion/
+      Empleados/
+  modules/
+    RellenoSanitario.ts
+    DiadeRecoleccion.ts
+```
+
+## Flujo de autenticacion
+
+Pantalla:
+
+```txt
+src/Pages/Login/Login.tsx
+```
+
+Servicio base:
+
+```txt
+src/services/api.ts
+```
+
+Endpoint:
+
+```txt
+POST /api/empleados/login
+```
+
+Body:
+
+```json
+{
+  "email": "usuario@recolecta.mx",
+  "password": "password"
+}
+```
+
+Respuesta esperada:
+
+```json
+{
+  "message": "login correcto",
+  "token": "jwt...",
+  "data": {
+    "rol_id": 1
+  }
+}
+```
+
+El frontend guarda:
+
+```txt
+localStorage.auth_token
+localStorage.auth_role
+```
+
+`auth_token` se envia en peticiones protegidas como:
+
+```txt
+Authorization: Bearer TOKEN
+```
+
+`auth_role` se usa para decidir que secciones se muestran y cuales rutas internas estan permitidas.
+
+## Servicios
+
+`src/services/api.ts`
+
+- contiene `apiRequest`
+- usa rutas relativas (`BASE_URL = ""`)
+- agrega `Content-Type: application/json`
+- agrega `Authorization: Bearer <token>` si existe token
+- guarda y limpia `auth_token`
+- guarda y limpia `auth_role`
+- limpia la sesion si la API responde `401`
+- expone `ApiError` con `status`
+
+`src/services/auth.ts`
+
+- define roles del backend:
+  - `ADMIN = 1`
+  - `CONDUCTOR = 2`
+  - `SUPERVISOR = 3`
+  - `COORDINADOR = 4`
+- define permisos por seccion
+- expone `canAccess`, `roleName` y `firstAccessibleAdminPath`
+
+## Rutas internas
+
+Archivo:
+
+```txt
+src/Router/AppRouter.tsx
+```
+
+Rutas principales:
+
+```txt
+/login
+/dashboard
+/historial
+/alertas
+/anomalias
+/estado-ruta
+/validacion-recoleccion
+/administracion/rellenos
+/administracion/camiones
+/administracion/dias-recoleccion
+/administracion/empleados
+```
+
+Proteccion:
+
+```txt
+src/Router/Guards.tsx
+```
+
+- `RequireAuth`: exige token.
+- `RequireRole`: exige token y rol permitido para la seccion.
+
+Si no hay token, redirige a `/login`. Si hay token pero el rol no tiene permiso, redirige a `/dashboard`.
+
+## Endpoints usados
+
+El proyecto centraliza las llamadas mediante `apiRequest`. Algunos endpoints usados:
+
+```txt
+POST /api/empleados/login
+GET  /api/rutas/
+GET  /api/puntos-recoleccion/
+POST /api/puntos-recoleccion/
+PUT  /api/puntos-recoleccion/:id
+DELETE /api/puntos-recoleccion/:id
+GET  /api/anomalias/
+POST /api/anomalias/
+PUT  /api/anomalias/:id
+GET  /api/relleno-sanitario/
+POST /api/relleno-sanitario/
+PUT  /api/relleno-sanitario/:id
+DELETE /api/relleno-sanitario/:id
+GET  /api/camion/
+POST /api/camion/
+PUT  /api/camion/:id
+DELETE /api/camion/:id
+GET  /api/tipo-camion/
+GET  /api/empleados/
+POST /api/empleados/
+DELETE /api/empleados/:id
+```
+
+## Roles y permisos visibles
+
+Los permisos del frontend estan en `src/services/auth.ts` y reflejan los roles del backend:
+
+- `Dashboard` e `Historial`: cualquier usuario autenticado.
+- `Anomalias`: ADMIN, SUPERVISOR, COORDINADOR.
+- `Alertas`: ADMIN, SUPERVISOR, COORDINADOR.
+- `Puntos de Ruta`: CONDUCTOR, SUPERVISOR, COORDINADOR.
+- `Validacion de Recoleccion`: ADMIN, SUPERVISOR, COORDINADOR.
+- `Administracion/Rellenos`: CONDUCTOR, SUPERVISOR, COORDINADOR.
+- `Administracion/Camiones`: CONDUCTOR, SUPERVISOR, COORDINADOR.
+- `Administracion/Dias de Recoleccion`: ADMIN, SUPERVISOR, COORDINADOR.
+- `Administracion/Empleados`: ADMIN.
+
+## Navbar y cierre de sesion
+
+Archivo:
+
+```txt
+src/components/Navigation/Navbar.tsx
+```
+
+El navbar:
+
+- muestra solo secciones permitidas para el rol guardado
+- muestra el nombre del rol
+- permite cerrar sesion
+- al cerrar sesion limpia `auth_token` y `auth_role`
+
+## Notas sobre CORS y ngrok
+
+Para desarrollo local, evita poner la URL de ngrok en `VITE_API_URL`, porque el navegador llamaria directo a otro origen y puede aparecer:
+
+```txt
+Access-Control-Allow-Origin missing
+Failed to fetch
+```
+
+Usa mejor:
+
+```env
+ALLOW_ALL_HOSTS=true
+ALLOWED_HOSTS=
+VITE_API_URL=
+API_PROXY_TARGET=https://TU-SUBDOMINIO.ngrok-free.app
+```
+
+Asi el navegador llama a `/api/...` en el mismo origen de Vite, y Vite reenvia la peticion al backend.
+
+## Archivos importantes
+
+- `vite.config.mjs`: configuracion real usada por scripts.
+- `.env.example`: ejemplo documentado para desarrollo y produccion.
+- `.env.development`: variables de desarrollo y pruebas.
+- `src/services/api.ts`: cliente HTTP, token y rol.
+- `src/services/auth.ts`: roles y permisos.
+- `src/Router/AppRouter.tsx`: rutas internas.
+- `src/Router/Guards.tsx`: proteccion por token y rol.
+- `src/Pages/Login/Login.tsx`: login.

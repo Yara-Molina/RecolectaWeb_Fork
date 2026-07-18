@@ -210,6 +210,49 @@
   box-shadow: 0 0 0 3px rgba(15, 103, 108, 0.12);
 }
 
+.rs-alert {
+  padding: 14px 18px;
+  border-radius: 10px;
+  background: rgba(226, 75, 74, 0.1);
+  border: 1px solid rgba(226, 75, 74, 0.25);
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.rs-loading {
+  padding: 30px;
+  text-align: center;
+  color: var(--text-light);
+}
+
+.rs-form-error {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(226, 75, 74, 0.1);
+  border: 1px solid rgba(226, 75, 74, 0.25);
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.rs-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.rs-checkbox input {
+  width: 16px;
+  height: 16px;
+}
+
 .rs-table-container {
   padding: 18px 20px 20px;
 }

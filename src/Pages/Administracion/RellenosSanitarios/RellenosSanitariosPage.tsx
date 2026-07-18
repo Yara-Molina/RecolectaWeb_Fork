@@ -1,61 +1,73 @@
 // src/Pages/Administracion/RellenosSanitarios/RellenosSanitariosPage.tsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./RellenosSanitariosPage.css";
 
-import RellenosSanitariosForm from "./components/RellenoForm";
+import RellenoForm from "./components/RellenoForm";
 import RellenosSanitariosTable from "./components/RellenosTable";
+import { apiRequest, ApiError } from "../../../services/api";
 
+// Modelo tal como lo devuelve la API (GET /api/relleno-sanitario/)
 export interface RellenoSanitario {
-  id: number;
+  relleno_id: number;
   nombre: string;
   direccion: string;
-  municipio: string;
-  capacidadToneladas: number;
-  estado: "Activo" | "Inactivo";
-  fechaRegistro: string;
+  es_rentado: boolean;
+  eliminado: boolean;
+  capacidad_toneladas: number;
 }
 
-const MOCK_RELLENOS: RellenoSanitario[] = [
-  {
-    id: 1,
-    nombre: "Relleno Sanitario Norte",
-    direccion: "Carretera Federal Km 12, Zona Industrial",
-    municipio: "Tuxtla Gutiérrez",
-    capacidadToneladas: 1500,
-    estado: "Activo",
-    fechaRegistro: "2026-02-01",
-  },
-  {
-    id: 2,
-    nombre: "Relleno Sanitario Oriente",
-    direccion: "Av. Principal s/n, Col. El Mirador",
-    municipio: "Chiapa de Corzo",
-    capacidadToneladas: 950,
-    estado: "Activo",
-    fechaRegistro: "2026-02-03",
-  },
-  {
-    id: 3,
-    nombre: "Relleno Sanitario Sur",
-    direccion: "Camino rural 5, Ejido San Pedro",
-    municipio: "Berriozábal",
-    capacidadToneladas: 600,
-    estado: "Inactivo",
-    fechaRegistro: "2026-02-05",
-  },
-];
+// Body esperado por POST /api/relleno-sanitario/ y PUT /api/relleno-sanitario/:id
+export interface RellenoSanitarioPayload {
+  nombre: string;
+  direccion: string;
+  es_rentado: boolean;
+  capacidad_toneladas: number;
+}
+
+function mensajeError(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) {
+    if (err.status === 401) return "Tu sesión expiró. Vuelve a iniciar sesión.";
+    if (err.status === 403) return "No tienes permisos para realizar esta acción.";
+    return err.message || fallback;
+  }
+  return err instanceof Error ? err.message : fallback;
+}
 
 export default function RellenosSanitariosPage() {
-  const [rellenos, setRellenos] = useState<RellenoSanitario[]>(MOCK_RELLENOS);
+  const navigate = useNavigate();
+
+  const [rellenos, setRellenos] = useState<RellenoSanitario[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const [search, setSearch] = useState("");
-  const [filtroEstado, setFiltroEstado] = useState<
-    "Todos" | "Activo" | "Inactivo"
-  >("Todos");
+  const [filtroTipo, setFiltroTipo] = useState<"Todos" | "Rentado" | "Propio">("Todos");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingRelleno, setEditingRelleno] =
-    useState<RellenoSanitario | null>(null);
+  const [editingRelleno, setEditingRelleno] = useState<RellenoSanitario | null>(null);
+
+  async function loadRellenos() {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // El backend responde el arreglo tal cual (sin envolver en { data: ... }).
+      const response = await apiRequest<RellenoSanitario[] | null>("/api/relleno-sanitario/");
+      setRellenos(response ?? []);
+    } catch (err) {
+      const msg = mensajeError(err, "No se pudieron cargar los rellenos sanitarios.");
+      setError(msg);
+      if (err instanceof ApiError && err.status === 401) navigate("/login");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadRellenos();
+  }, []);
 
   // =========================
   // Filtrado
@@ -67,25 +79,28 @@ export default function RellenosSanitariosPage() {
       const matchSearch =
         q.length === 0 ||
         r.nombre.toLowerCase().includes(q) ||
-        r.direccion.toLowerCase().includes(q) ||
-        r.municipio.toLowerCase().includes(q);
+        r.direccion.toLowerCase().includes(q);
 
-      const matchEstado =
-        filtroEstado === "Todos" ? true : r.estado === filtroEstado;
+      const matchTipo =
+        filtroTipo === "Todos"
+          ? true
+          : filtroTipo === "Rentado"
+          ? r.es_rentado
+          : !r.es_rentado;
 
-      return matchSearch && matchEstado;
+      return matchSearch && matchTipo;
     });
-  }, [rellenos, search, filtroEstado]);
+  }, [rellenos, search, filtroTipo]);
 
   // =========================
   // Cards resumen
   // =========================
   const resumen = useMemo(() => {
     const total = rellenos.length;
-    const activos = rellenos.filter((r) => r.estado === "Activo").length;
-    const inactivos = rellenos.filter((r) => r.estado === "Inactivo").length;
+    const rentados = rellenos.filter((r) => r.es_rentado).length;
+    const propios = total - rentados;
 
-    return { total, activos, inactivos };
+    return { total, rentados, propios };
   }, [rellenos]);
 
   // =========================
@@ -102,74 +117,70 @@ export default function RellenosSanitariosPage() {
   };
 
   const closeModal = () => {
+    if (saving) return;
     setIsModalOpen(false);
     setEditingRelleno(null);
   };
 
-  const handleDelete = (id: number) => {
-    const relleno = rellenos.find((r) => r.id === id);
+  const handleDelete = async (id: number) => {
+    const relleno = rellenos.find((r) => r.relleno_id === id);
     if (!relleno) return;
 
-    const ok = confirm(
-      `¿Seguro que deseas eliminar el relleno "${relleno.nombre}"?`
-    );
-
+    const ok = confirm(`¿Seguro que deseas eliminar el relleno "${relleno.nombre}"?`);
     if (!ok) return;
 
-    setRellenos((prev) => prev.filter((r) => r.id !== id));
+    setSaving(true);
+    setError(null);
+
+    try {
+      await apiRequest(`/api/relleno-sanitario/${id}`, { method: "DELETE" });
+      await loadRellenos();
+    } catch (err) {
+      const msg = mensajeError(err, "No se pudo eliminar el relleno sanitario.");
+      setError(msg);
+      if (err instanceof ApiError && err.status === 401) navigate("/login");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleSave = (data: Omit<RellenoSanitario, "id" | "fechaRegistro">) => {
-    // Si es edición
-    if (editingRelleno) {
-      setRellenos((prev) =>
-        prev.map((r) =>
-          r.id === editingRelleno.id
-            ? {
-                ...r,
-                ...data,
-              }
-            : r
-        )
-      );
+  const handleSave = async (data: RellenoSanitarioPayload) => {
+    setSaving(true);
+    setError(null);
+
+    try {
+      if (editingRelleno) {
+        await apiRequest(`/api/relleno-sanitario/${editingRelleno.relleno_id}`, {
+          method: "PUT",
+          body: JSON.stringify(data),
+        });
+      } else {
+        await apiRequest("/api/relleno-sanitario/", {
+          method: "POST",
+          body: JSON.stringify(data),
+        });
+      }
 
       closeModal();
-      return;
+      await loadRellenos();
+    } catch (err) {
+      const msg = mensajeError(err, "No se pudo guardar el relleno sanitario.");
+      setError(msg);
+      if (err instanceof ApiError && err.status === 401) navigate("/login");
+    } finally {
+      setSaving(false);
     }
-
-    // Si es nuevo
-    const nextId = Math.max(0, ...rellenos.map((r) => r.id)) + 1;
-
-    const nuevo: RellenoSanitario = {
-      id: nextId,
-      fechaRegistro: new Date().toISOString().slice(0, 10),
-      ...data,
-    };
-
-    setRellenos((prev) => [nuevo, ...prev]);
-    closeModal();
   };
 
   const handleExport = () => {
-    // Export simple CSV (mock)
-    const headers = [
-      "ID",
-      "Nombre",
-      "Dirección",
-      "Municipio",
-      "Capacidad (Ton)",
-      "Estado",
-      "Fecha Registro",
-    ];
+    const headers = ["ID", "Nombre", "Dirección", "Capacidad (Ton)", "Rentado"];
 
     const rows = filteredRellenos.map((r) => [
-      r.id,
+      r.relleno_id,
       r.nombre,
       r.direccion,
-      r.municipio,
-      r.capacidadToneladas,
-      r.estado,
-      r.fechaRegistro,
+      r.capacidad_toneladas,
+      r.es_rentado ? "Sí" : "No",
     ]);
 
     const csv = [headers, ...rows]
@@ -181,9 +192,7 @@ export default function RellenosSanitariosPage() {
 
     const a = document.createElement("a");
     a.href = url;
-    a.download = `rellenos_sanitarios_${new Date()
-      .toISOString()
-      .slice(0, 10)}.csv`;
+    a.download = `rellenos_sanitarios_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
 
     URL.revokeObjectURL(url);
@@ -207,13 +216,13 @@ export default function RellenosSanitariosPage() {
           </div>
 
           <div className="rs-card">
-            <div className="rs-card-title">Activos</div>
-            <div className="rs-card-value">{resumen.activos}</div>
+            <div className="rs-card-title">Rentados</div>
+            <div className="rs-card-value">{resumen.rentados}</div>
           </div>
 
           <div className="rs-card">
-            <div className="rs-card-title">Inactivos</div>
-            <div className="rs-card-value">{resumen.inactivos}</div>
+            <div className="rs-card-title">Propios</div>
+            <div className="rs-card-value">{resumen.propios}</div>
           </div>
         </div>
       </div>
@@ -222,11 +231,11 @@ export default function RellenosSanitariosPage() {
           BOTONES PRINCIPALES
       ======================= */}
       <div className="rs-actions">
-        <button className="rs-btn rs-btn-secondary">
+        <button className="rs-btn rs-btn-secondary" onClick={() => void loadRellenos()}>
           📋 Ver Rellenos
         </button>
 
-        <button className="rs-btn rs-btn-primary" onClick={openCreate}>
+        <button className="rs-btn rs-btn-primary" onClick={openCreate} disabled={saving}>
           ➕ Crear Relleno
         </button>
       </div>
@@ -237,24 +246,24 @@ export default function RellenosSanitariosPage() {
       <div className="rs-filters">
         <div className="rs-filter-left">
           <button
-            className={`rs-chip ${filtroEstado === "Todos" ? "active" : ""}`}
-            onClick={() => setFiltroEstado("Todos")}
+            className={`rs-chip ${filtroTipo === "Todos" ? "active" : ""}`}
+            onClick={() => setFiltroTipo("Todos")}
           >
             Todos
           </button>
 
           <button
-            className={`rs-chip ${filtroEstado === "Activo" ? "active" : ""}`}
-            onClick={() => setFiltroEstado("Activo")}
+            className={`rs-chip ${filtroTipo === "Rentado" ? "active" : ""}`}
+            onClick={() => setFiltroTipo("Rentado")}
           >
-            Activos
+            Rentados
           </button>
 
           <button
-            className={`rs-chip ${filtroEstado === "Inactivo" ? "active" : ""}`}
-            onClick={() => setFiltroEstado("Inactivo")}
+            className={`rs-chip ${filtroTipo === "Propio" ? "active" : ""}`}
+            onClick={() => setFiltroTipo("Propio")}
           >
-            Inactivos
+            Propios
           </button>
         </div>
 
@@ -263,7 +272,7 @@ export default function RellenosSanitariosPage() {
             className="rs-search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nombre, municipio o dirección..."
+            placeholder="Buscar por nombre o dirección..."
           />
 
           <button className="rs-btn rs-btn-outline" onClick={handleExport}>
@@ -271,6 +280,8 @@ export default function RellenosSanitariosPage() {
           </button>
         </div>
       </div>
+
+      {error && <div className="rs-alert">{error}</div>}
 
       {/* =======================
           TABLA
@@ -285,16 +296,20 @@ export default function RellenosSanitariosPage() {
           </span>
         </div>
 
-        <RellenosSanitariosTable
-          data={filteredRellenos}
-          onEdit={openEdit}
-          onDelete={handleDelete}
-          onDetails={(relleno) => {
-            alert(
-              `Detalles:\n\nNombre: ${relleno.nombre}\nMunicipio: ${relleno.municipio}\nCapacidad: ${relleno.capacidadToneladas} ton`
-            );
-          }}
-        />
+        {loading ? (
+          <div className="rs-loading">Cargando rellenos sanitarios...</div>
+        ) : (
+          <RellenosSanitariosTable
+            data={filteredRellenos}
+            onEdit={openEdit}
+            onDelete={handleDelete}
+            onDetails={(relleno) => {
+              alert(
+                `Detalles:\n\nNombre: ${relleno.nombre}\nDirección: ${relleno.direccion}\nCapacidad: ${relleno.capacidad_toneladas} ton\nTipo: ${relleno.es_rentado ? "Rentado" : "Propio"}`
+              );
+            }}
+          />
+        )}
       </div>
 
       {/* =======================
@@ -310,14 +325,15 @@ export default function RellenosSanitariosPage() {
               <h2>
                 {editingRelleno ? "Editar Relleno" : "Crear Relleno"}
               </h2>
-              <button className="rs-modal-close" onClick={closeModal}>
+              <button className="rs-modal-close" onClick={closeModal} disabled={saving}>
                 ✕
               </button>
             </div>
 
-            <RellenosSanitariosForm
-              key={editingRelleno?.id ?? "new"}
+            <RellenoForm
+              key={editingRelleno?.relleno_id ?? "new"}
               initialData={editingRelleno}
+              saving={saving}
               onCancel={closeModal}
               onSave={handleSave}
             />

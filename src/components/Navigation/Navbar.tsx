@@ -1,10 +1,20 @@
-import { NavLink } from 'react-router-dom';
-import { useState, useEffect } from 'react';
-import './Navbar.css'; 
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import './Navbar.css';
 import Logo from '../../Assets/Logo.png';
+import { clearSession } from '../../services/api';
+import { canAccess, roleName, type SectionKey } from '../../services/auth';
+
+interface NavItem {
+  id: string;
+  label: string;
+  path: string;
+  section?: SectionKey;
+}
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -15,29 +25,34 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', path: '/dashboard' },
-    { id: 'mapa', label: 'Mapa', path: '/mapa' },
-    { id: 'historial', label: 'Historial', path: '/historial' },
-    { id: 'alertas', label: 'Alertas', path: '/alertas' },
-    { id: 'anomalias', label: 'Anomalias', path: '/anomalias' },
-    { id: 'Puntos_de_ruta', label: 'Puntos de Ruta', path: '/estado-ruta' },
-    { id: 'Recoleccion', label: 'Recolección', path: '/validacion-recoleccion' },
-    { id: 'Administracion', label: 'Administración', path: '/administracion' },
+  const allNavItems: NavItem[] = [
+    { id: 'dashboard', label: 'Dashboard', path: '/dashboard', section: 'dashboard' },
+    { id: 'historial', label: 'Historial', path: '/historial', section: 'historial' },
+    { id: 'alertas', label: 'Alertas', path: '/alertas', section: 'alertas' },
+    { id: 'anomalias', label: 'Anomalias', path: '/anomalias', section: 'anomalias' },
+    { id: 'Puntos_de_ruta', label: 'Puntos de Ruta', path: '/estado-ruta', section: 'estadoRuta' },
+    // Validación de Recolección: oculta del navbar por ahora (pendiente de
+    // implementar), pero la ruta y la vista se dejan intactas.
+    { id: 'Administracion', label: 'Administración', path: '/administracion', section: 'administracion' },
   ];
 
+  // Solo se muestran los apartados a los que el rol de la cuenta tiene acceso.
+  const navItems = useMemo(() => allNavItems.filter((item) => !item.section || canAccess(item.section)), []);
+
+  const handleLogout = () => {
+    clearSession();
+    navigate('/login');
+  };
+
   return (
-    // Agregar el contenedor principal con el prefijo
     <div className="anomalias-nav-container">
       <nav className={`anomalias-navbar ${scrolled ? 'scrolled' : ''}`}>
         <div className="anomalias-navbar-inner">
-          
-          {/* Logo - Más grande */}
+
           <div className="anomalias-navbar-left">
             <img src={Logo} alt="Logo Recolecta" className="anomalias-navbar-logo" />
           </div>
 
-          {/* Navegación - Sin tooltips */}
           <div className="anomalias-navbar-center">
             {navItems.map((item) => (
               <NavLink
@@ -46,20 +61,26 @@ export default function Navbar() {
                 className={({ isActive }) =>
                   `anomalias-nav-link ${isActive ? 'active' : ''}`
                 }
-                // Removido title={item.label} para eliminar tooltips
               >
                 {item.label}
               </NavLink>
             ))}
           </div>
 
-          {/* Usuario - Simple, sin notificaciones */}
           <div className="anomalias-navbar-right">
-            <div className="anomalias-nav-user-icon">👤</div>
+            <span style={{ marginRight: 12, fontSize: 13, opacity: 0.85 }}>{roleName()}</span>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="anomalias-nav-user-icon"
+              style={{ cursor: 'pointer', border: 'none', background: 'transparent' }}
+              title="Cerrar sesión"
+            >
+              👤
+            </button>
           </div>
 
         </div>
-        {/* No hay barra de progreso */}
       </nav>
     </div>
   );

@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom
 
 import Login from "../Pages/Login/Login";
 import Navbar from "../components/Navigation/Navbar";
+import { RequireAuth, RequireRole } from "./Guards";
+import { firstAccessibleAdminPath } from "../services/auth";
 
 // Páginas globales
 import Dashboard from "../Pages/Dashboard/Dashboard";
@@ -20,6 +22,7 @@ import AdministracionLayout from "../Pages/Administracion/AdministracionLayout";
 import RellenosSanitariosPage from "../Pages/Administracion/RellenosSanitarios/RellenosSanitariosPage";
 import CamionesPage from "../Pages/Administracion/Camiones/CamionesPage";
 import DiasRecoleccionPage from "../Pages/Administracion/DiasRecoleccion/DiasRecoleccionPage";
+import EmpleadosPage from "../Pages/Administracion/Empleados/EmpleadosPage";
 
 // Layout global (Navbar + contenido)
 function AppLayout() {
@@ -29,6 +32,15 @@ function AppLayout() {
       <Outlet />
     </>
   );
+}
+
+// El índice de /administracion no siempre puede ir a "rellenos": ese
+// apartado no es visible para todos los roles. Se manda a la primera
+// sub-sección que el rol de la cuenta sí puede ver (o a /dashboard si
+// no tiene acceso a ninguna).
+function AdministracionIndex() {
+  const path = firstAccessibleAdminPath();
+  return <Navigate to={path ?? "/dashboard"} replace />;
 }
 
 export default function AppRouter() {
@@ -44,22 +56,85 @@ export default function AppRouter() {
         {/* ==========================
             RUTAS CON NAVBAR (GLOBAL)
            ========================== */}
-        <Route element={<AppLayout />}>
+        <Route
+          element={
+            <RequireAuth>
+              <AppLayout />
+            </RequireAuth>
+          }
+        >
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/historial" element={<Historial />} />
-          <Route path="/alertas" element={<Alertas />} />
-          <Route path="/anomalias" element={<Anomalias />} />
-          <Route path="/estado-ruta" element={<EstadoRuta />} />
-          <Route path="/validacion-recoleccion" element={<ValidacionRecoleccion />} />
+          <Route
+            path="/alertas"
+            element={
+              <RequireRole section="alertas">
+                <Alertas />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/anomalias"
+            element={
+              <RequireRole section="anomalias">
+                <Anomalias />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/estado-ruta"
+            element={
+              <RequireRole section="estadoRuta">
+                <EstadoRuta />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/validacion-recoleccion"
+            element={
+              <RequireRole section="validacionRecoleccion">
+                <ValidacionRecoleccion />
+              </RequireRole>
+            }
+          />
 
           {/* ==========================
               ADMINISTRACIÓN (Nested)
              ========================== */}
           <Route path="/administracion" element={<AdministracionLayout />}>
-            <Route index element={<Navigate to="rellenos" replace />} />
-            <Route path="rellenos" element={<RellenosSanitariosPage />} />
-            <Route path="camiones" element={<CamionesPage />} />
-            <Route path="dias-recoleccion" element={<DiasRecoleccionPage />} />
+            <Route index element={<AdministracionIndex />} />
+            <Route
+              path="rellenos"
+              element={
+                <RequireRole section="administracionRellenos">
+                  <RellenosSanitariosPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="camiones"
+              element={
+                <RequireRole section="administracionCamiones">
+                  <CamionesPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="dias-recoleccion"
+              element={
+                <RequireRole section="administracionDiasRecoleccion">
+                  <DiasRecoleccionPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="empleados"
+              element={
+                <RequireRole section="administracionEmpleados">
+                  <EmpleadosPage />
+                </RequireRole>
+              }
+            />
           </Route>
         </Route>
 

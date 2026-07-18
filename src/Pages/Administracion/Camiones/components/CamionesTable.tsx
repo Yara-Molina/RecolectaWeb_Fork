@@ -1,14 +1,24 @@
 // src/Pages/Administracion/Camiones/components/CamionesTable.tsx
-import { FaEye, FaEdit, FaTrashAlt } from "react-icons/fa";
-import type { CamionMock } from "../CamionesPage";
+import { FaEdit, FaTrashAlt } from "react-icons/fa";
+import { ESTADOS_DISPONIBILIDAD } from "../CamionesPage";
+import type { Camion, TipoCamion } from "../CamionesPage";
+
+// El backend devuelve color_disponibilidad como nombre CSS ("green", "orange", ...),
+// no como hex, así que no sirve para el truco de transparencia (`${color}1a`).
+// Usamos nuestro propio mapa de hex (mismo que en el formulario) para pintar el badge,
+// y dejamos el nombre que manda el backend como texto.
+function getColorHex(nombreDisponibilidad: string): string | undefined {
+  return ESTADOS_DISPONIBILIDAD.find((e) => e.nombre === nombreDisponibilidad)?.color;
+}
 
 interface Props {
-  camiones: CamionMock[];
-  onEditar: (camion: CamionMock) => void;
+  camiones: Camion[];
+  tiposCamion: TipoCamion[];
+  onEditar: (camion: Camion) => void;
   onEliminar: (camion_id: number) => void;
 }
 
-export default function CamionesTable({ camiones, onEditar, onEliminar }: Props) {
+export default function CamionesTable({ camiones, tiposCamion, onEditar, onEliminar }: Props) {
   if (camiones.length === 0) {
     return (
       <div className="empty-state">
@@ -28,7 +38,7 @@ export default function CamionesTable({ camiones, onEditar, onEliminar }: Props)
             <th>TIPO</th>
             <th>RENTADO</th>
             <th>DISPONIBILIDAD</th>
-            <th style={{ width: 360 }}>ACCIONES</th>
+            <th style={{ width: 260 }}>ACCIONES</th>
           </tr>
         </thead>
 
@@ -37,7 +47,7 @@ export default function CamionesTable({ camiones, onEditar, onEliminar }: Props)
             <tr key={c.camion_id}>
               <td className="mono">{c.placa}</td>
               <td>{c.modelo}</td>
-              <td>{c.tipo_camion?.nombre ?? "—"}</td>
+              <td>{tiposCamion.find((t) => t.tipo_camion_id === c.tipo_camion_id)?.nombre ?? "—"}</td>
               <td>
                 <span className={c.es_rentado ? "pill rentado" : "pill"}>
                   {c.es_rentado ? "Sí" : "No"}
@@ -45,21 +55,25 @@ export default function CamionesTable({ camiones, onEditar, onEliminar }: Props)
               </td>
 
               <td>
-                <span className={`status ${c.disponibilidad.toLowerCase()}`}>
-                  {c.disponibilidad === "DISPONIBLE" && "Disponible"}
-                  {c.disponibilidad === "EN_RUTA" && "En ruta"}
-                  {c.disponibilidad === "MANTENIMIENTO" && "Mantenimiento"}
-                  {c.disponibilidad === "FUERA_SERVICIO" && "Fuera de servicio"}
-                </span>
+                {(() => {
+                  const hex = getColorHex(c.nombre_disponibilidad);
+                  return (
+                    <span
+                      className="status"
+                      style={{
+                        backgroundColor: hex ? `${hex}1a` : undefined,
+                        color: hex ?? undefined,
+                        borderColor: hex ? `${hex}33` : undefined,
+                      }}
+                    >
+                      {c.nombre_disponibilidad || "—"}
+                    </span>
+                  );
+                })()}
               </td>
 
               <td>
                 <div className="actions">
-                  <button className="btn btn-details">
-                    <FaEye />
-                    Detalles
-                  </button>
-
                   <button className="btn btn-edit" onClick={() => onEditar(c)}>
                     <FaEdit />
                     Editar

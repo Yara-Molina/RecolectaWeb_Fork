@@ -1,5 +1,4 @@
-// src/Pages/Administracion/RellenosSanitarios/RellenosSanitariosTable.tsx
-// src/Pages/Administracion/RellenosSanitarios/RellenosSanitariosTable.tsx
+// src/Pages/Administracion/RellenosSanitarios/components/RellenosTable.tsx
 import type { RellenoSanitario } from "../RellenosSanitariosPage";
 
 interface Props {
@@ -22,9 +21,8 @@ export default function RellenosSanitariosTable({
           <tr>
             <th>NOMBRE</th>
             <th>DIRECCIÓN</th>
-            <th>MUNICIPIO</th>
             <th>CAPACIDAD</th>
-            <th>ESTADO</th>
+            <th>TIPO</th>
             <th style={{ width: 320 }}>ACCIONES</th>
           </tr>
         </thead>
@@ -32,32 +30,27 @@ export default function RellenosSanitariosTable({
         <tbody>
           {data.length === 0 ? (
             <tr>
-              <td colSpan={6} style={{ textAlign: "center", padding: 30 }}>
+              <td colSpan={5} style={{ textAlign: "center", padding: 30 }}>
                 No hay rellenos sanitarios para mostrar.
               </td>
             </tr>
           ) : (
             data.map((r) => (
-              <tr key={r.id}>
+              <tr key={r.relleno_id}>
                 <td>
                   <b>{r.nombre}</b>
-                  <div className="rs-subtext">ID: RS-{String(r.id).padStart(3, "0")}</div>
+                  <div className="rs-subtext">ID: RS-{String(r.relleno_id).padStart(3, "0")}</div>
                 </td>
 
-                <td>{r.direccion}</td>
-                <td>{r.municipio}</td>
+                <td>{r.direccion || "—"}</td>
 
                 <td>
-                  <b>{r.capacidadToneladas}</b> ton
+                  <b>{r.capacidad_toneladas}</b> ton
                 </td>
 
                 <td>
-                  <span
-                    className={`rs-badge ${
-                      r.estado === "Activo" ? "active" : "inactive"
-                    }`}
-                  >
-                    {r.estado}
+                  <span className={`rs-badge ${r.es_rentado ? "inactive" : "active"}`}>
+                    {r.es_rentado ? "Rentado" : "Propio"}
                   </span>
                 </td>
 
@@ -79,7 +72,7 @@ export default function RellenosSanitariosTable({
 
                     <button
                       className="rs-action rs-delete"
-                      onClick={() => onDelete(r.id)}
+                      onClick={() => onDelete(r.relleno_id)}
                     >
                       🗑 Eliminar
                     </button>

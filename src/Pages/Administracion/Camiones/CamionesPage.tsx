@@ -1,97 +1,109 @@
 // src/Pages/Administracion/Camiones/CamionesPage.tsx
-import { useMemo, useState } from "react";
-import { FaTruck, FaCheckCircle, FaClock, FaPlus, FaList, FaFileExport } from "react-icons/fa";
+import { useEffect, useMemo, useState } from "react";
+import { FaTruck, FaCheckCircle, FaPlus, FaList, FaFileExport } from "react-icons/fa";
 import CamionesTable from "./components/CamionesTable";
 import CamionForm from "./components/CamionForm";
+import { apiRequest } from "../../../services/api";
 import "./CamionesPage.css";
 
-export type DisponibilidadCamion =
-  | "DISPONIBLE"
-  | "EN_RUTA"
-  | "MANTENIMIENTO"
-  | "FUERA_SERVICIO";
-
-export interface TipoCamionMock {
+export interface TipoCamion {
   tipo_camion_id: number;
   nombre: string;
+  descripcion: string;
+  created_at: string;
 }
 
-export interface CamionMock {
+export interface Camion {
   camion_id: number;
   placa: string;
   modelo: string;
   tipo_camion_id: number;
   es_rentado: boolean;
-  disponibilidad: DisponibilidadCamion;
-  eliminado: boolean;
-  created_at?: string;
-  updated_at?: string;
-
-  tipo_camion?: TipoCamionMock;
+  disponibilidad_id: number;
+  nombre_disponibilidad: string;
+  color_disponibilidad: string;
+  created_at: string;
+  updated_at: string;
 }
 
-const TIPOS_CAMION: TipoCamionMock[] = [
-  { tipo_camion_id: 1, nombre: "Compactador" },
-  { tipo_camion_id: 2, nombre: "Volteo" },
-  { tipo_camion_id: 3, nombre: "Recolección Ligera" },
-];
+// El backend (CreateCamionRequest/UpdateCamionRequest en camion_swagger.go) solo
+// acepta estos 5 campos. nombre_disponibilidad y color_disponibilidad NO se envían:
+// el backend los deriva siempre de disponibilidad_id (ver mapEstadoToDisponibilidad
+// en PostgresCamion.go), así que mandarlos no tendría ningún efecto.
+export interface CamionPayload {
+  placa: string;
+  modelo: string;
+  tipo_camion_id: number;
+  es_rentado: boolean;
+  disponibilidad_id: number;
+}
 
-const CAMIONES_MOCK: CamionMock[] = [
-  {
-    camion_id: 1,
-    placa: "CHP-203-A",
-    modelo: "Freightliner M2 2020",
-    tipo_camion_id: 1,
-    es_rentado: false,
-    disponibilidad: "DISPONIBLE",
-    eliminado: false,
-  },
-  {
-    camion_id: 2,
-    placa: "CHP-998-B",
-    modelo: "International 2018",
-    tipo_camion_id: 2,
-    es_rentado: true,
-    disponibilidad: "EN_RUTA",
-    eliminado: false,
-  },
-  {
-    camion_id: 3,
-    placa: "CHP-450-X",
-    modelo: "Kenworth 2016",
-    tipo_camion_id: 1,
-    es_rentado: false,
-    disponibilidad: "MANTENIMIENTO",
-    eliminado: false,
-  },
-];
-
-type EstadoFiltro = "TODOS" | "DISPONIBLE" | "EN_RUTA" | "MANTENIMIENTO" | "FUERA_SERVICIO";
+// Estados fijos que maneja el backend para disponibilidad_id (mapEstadoToDisponibilidad
+// en src/Rutas/infraestructure/adapters/PostgresCamion.go). No es un catálogo con
+// endpoint propio: son estos 4 valores, siempre.
+export const ESTADOS_DISPONIBILIDAD = [
+  { id: 1, nombre: "OPERATIVO", label: "Operativo", color: "#2e7d32" },
+  { id: 2, nombre: "MANTENIMIENTO", label: "Mantenimiento", color: "#e88d1d" },
+  { id: 3, nombre: "FUERA_SERVICIO", label: "Fuera de servicio", color: "#e24b4a" },
+  { id: 4, nombre: "BAJA", label: "Baja", color: "#757575" },
+] as const;
 
 export default function CamionesPage() {
-  const [camiones, setCamiones] = useState<CamionMock[]>(() => {
-    // Inyectamos el tipo_camion para que la tabla sea más fácil
-    return CAMIONES_MOCK.map((c) => ({
-      ...c,
-      tipo_camion: TIPOS_CAMION.find((t) => t.tipo_camion_id === c.tipo_camion_id),
-    }));
-  });
+  const [camiones, setCamiones] = useState<Camion[]>([]);
+  const [tiposCamion, setTiposCamion] = useState<TipoCamion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const [search, setSearch] = useState("");
-  const [estadoFiltro, setEstadoFiltro] = useState<EstadoFiltro>("TODOS");
+  const [estadoFiltro, setEstadoFiltro] = useState("TODOS");
   const [soloRentados, setSoloRentados] = useState(false);
 
   // Modal / Form
   const [modalOpen, setModalOpen] = useState(false);
   const [modoForm, setModoForm] = useState<"CREAR" | "EDITAR">("CREAR");
-  const [camionSeleccionado, setCamionSeleccionado] = useState<CamionMock | null>(null);
+  const [camionSeleccionado, setCamionSeleccionado] = useState<Camion | null>(null);
+
+  async function loadCamiones() {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await apiRequest<{ data: Camion[] }>("/api/camion/");
+      setCamiones(response.data ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudieron cargar los camiones.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadTiposCamion() {
+    try {
+      const response = await apiRequest<{ data: TipoCamion[] }>("/api/tipo-camion/");
+      setTiposCamion(response.data ?? []);
+    } catch {
+      // El catálogo de tipos es secundario: si falla, el formulario simplemente lo mostrará vacío.
+    }
+  }
+
+  useEffect(() => {
+    void loadCamiones();
+    void loadTiposCamion();
+  }, []);
+
+  const estadosDisponibles = useMemo(() => {
+    const nombres = camiones
+      .map((c) => c.nombre_disponibilidad)
+      .filter((n): n is string => Boolean(n));
+    return Array.from(new Set(nombres));
+  }, [camiones]);
 
   const camionesFiltrados = useMemo(() => {
     return camiones
-      .filter((c) => !c.eliminado)
       .filter((c) => {
         if (estadoFiltro === "TODOS") return true;
-        return c.disponibilidad === estadoFiltro;
+        return c.nombre_disponibilidad === estadoFiltro;
       })
       .filter((c) => {
         if (!soloRentados) return true;
@@ -101,23 +113,20 @@ export default function CamionesPage() {
         const q = search.trim().toLowerCase();
         if (!q) return true;
 
+        const tipoNombre = tiposCamion.find((t) => t.tipo_camion_id === c.tipo_camion_id)?.nombre ?? "";
+
         return (
           c.placa.toLowerCase().includes(q) ||
           c.modelo.toLowerCase().includes(q) ||
-          (c.tipo_camion?.nombre ?? "").toLowerCase().includes(q)
+          tipoNombre.toLowerCase().includes(q)
         );
       });
-  }, [camiones, estadoFiltro, soloRentados, search]);
+  }, [camiones, estadoFiltro, soloRentados, search, tiposCamion]);
 
   const resumen = useMemo(() => {
-    const activos = camiones.filter((c) => !c.eliminado);
-
-    const total = activos.length;
-    const disponibles = activos.filter((c) => c.disponibilidad === "DISPONIBLE").length;
-    const enRuta = activos.filter((c) => c.disponibilidad === "EN_RUTA").length;
-    const mantenimiento = activos.filter((c) => c.disponibilidad === "MANTENIMIENTO").length;
-
-    return { total, disponibles, enRuta, mantenimiento };
+    const total = camiones.length;
+    const rentados = camiones.filter((c) => c.es_rentado).length;
+    return { total, rentados };
   }, [camiones]);
 
   function abrirCrear() {
@@ -126,7 +135,7 @@ export default function CamionesPage() {
     setModalOpen(true);
   }
 
-  function abrirEditar(camion: CamionMock) {
+  function abrirEditar(camion: Camion) {
     setModoForm("EDITAR");
     setCamionSeleccionado(camion);
     setModalOpen(true);
@@ -136,57 +145,57 @@ export default function CamionesPage() {
     setModalOpen(false);
   }
 
-  function eliminarCamion(camion_id: number) {
+  async function eliminarCamion(camion_id: number) {
     const ok = confirm("¿Seguro que deseas eliminar este camión?");
     if (!ok) return;
 
-    setCamiones((prev) =>
-      prev.map((c) => (c.camion_id === camion_id ? { ...c, eliminado: true } : c))
-    );
+    setSaving(true);
+    setError(null);
+
+    try {
+      await apiRequest(`/api/camion/${camion_id}`, { method: "DELETE" });
+      await loadCamiones();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo eliminar el camión.");
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function onSubmitForm(data: Omit<CamionMock, "camion_id" | "eliminado" | "tipo_camion">) {
-    if (modoForm === "CREAR") {
-      const nuevo: CamionMock = {
-        camion_id: Date.now(), // mock id
-        eliminado: false,
-        ...data,
-        tipo_camion: TIPOS_CAMION.find((t) => t.tipo_camion_id === data.tipo_camion_id),
-      };
+  async function onSubmitForm(data: CamionPayload) {
+    setSaving(true);
+    setError(null);
 
-      setCamiones((prev) => [nuevo, ...prev]);
+    try {
+      if (modoForm === "CREAR") {
+        await apiRequest("/api/camion/", {
+          method: "POST",
+          body: JSON.stringify(data),
+        });
+      } else if (camionSeleccionado) {
+        await apiRequest(`/api/camion/${camionSeleccionado.camion_id}`, {
+          method: "PUT",
+          body: JSON.stringify(data),
+        });
+      }
+
       setModalOpen(false);
-      return;
+      await loadCamiones();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo guardar el camión.");
+    } finally {
+      setSaving(false);
     }
-
-    // EDITAR
-    if (!camionSeleccionado) return;
-
-    setCamiones((prev) =>
-      prev.map((c) => {
-        if (c.camion_id !== camionSeleccionado.camion_id) return c;
-
-        return {
-          ...c,
-          ...data,
-          updated_at: new Date().toISOString(),
-          tipo_camion: TIPOS_CAMION.find((t) => t.tipo_camion_id === data.tipo_camion_id),
-        };
-      })
-    );
-
-    setModalOpen(false);
   }
 
   function exportarCSV() {
-    // Export simple sin librerías
     const headers = ["placa", "modelo", "tipo", "rentado", "disponibilidad"];
     const rows = camionesFiltrados.map((c) => [
       c.placa,
       c.modelo,
-      c.tipo_camion?.nombre ?? "",
+      tiposCamion.find((t) => t.tipo_camion_id === c.tipo_camion_id)?.nombre ?? "",
       c.es_rentado ? "SI" : "NO",
-      c.disponibilidad,
+      c.nombre_disponibilidad,
     ]);
 
     const csv = [headers, ...rows]
@@ -207,9 +216,6 @@ export default function CamionesPage() {
   return (
     <div className="admin-page">
       <div className="camiones">
-        {/* =========================
-            HEADER (estilo tu ejemplo)
-          ========================= */}
         <section className="camiones admin-header">
           <div className="camiones admin-header-left">
             <h1>Camiones</h1>
@@ -232,41 +238,25 @@ export default function CamionesPage() {
                 <FaCheckCircle />
               </div>
               <div>
-                <h3 className="camiones mini-card-value">{resumen.disponibles}</h3>
-                <span className="camiones mini-card-label">Disponibles</span>
-              </div>
-            </div>
-
-            <div className="camiones mini-card">
-              <div className="camiones mini-card-icon warn">
-                <FaClock />
-              </div>
-              <div>
-                <h3 className="camiones mini-card-value">{resumen.mantenimiento}</h3>
-                <span className="camiones mini-card-label">Mantenimiento</span>
+                <h3 className="camiones mini-card-value">{resumen.rentados}</h3>
+                <span className="camiones mini-card-label">Rentados</span>
               </div>
             </div>
           </div>
         </section>
 
-        {/* =========================
-            BARRA DE ACCIONES
-          ========================= */}
         <section className="camiones admin-actions-bar">
-          <button className="camiones btn camiones btn-light">
+          <button className="camiones btn camiones btn-light" onClick={() => void loadCamiones()}>
             <FaList />
             Ver Camiones
           </button>
 
-          <button className="camiones btn camiones btn-primary" onClick={abrirCrear}>
+          <button className="camiones btn camiones btn-primary" onClick={abrirCrear} disabled={saving}>
             <FaPlus />
             Crear Camión
           </button>
         </section>
 
-        {/* =========================
-            FILTROS (como tu ejemplo)
-          ========================= */}
         <section className="camiones admin-filters">
           <div className="camiones filters-left">
             <div className="camiones chip-group">
@@ -277,26 +267,15 @@ export default function CamionesPage() {
                 Todos
               </button>
 
-              <button
-                className={`camiones chip ${estadoFiltro === "DISPONIBLE" ? "camiones active" : ""}`}
-                onClick={() => setEstadoFiltro("DISPONIBLE")}
-              >
-                Disponibles
-              </button>
-
-              <button
-                className={`camiones chip ${estadoFiltro === "EN_RUTA" ? "camiones active" : ""}`}
-                onClick={() => setEstadoFiltro("EN_RUTA")}
-              >
-                En ruta
-              </button>
-
-              <button
-                className={`camiones chip ${estadoFiltro === "MANTENIMIENTO" ? "camiones active" : ""}`}
-                onClick={() => setEstadoFiltro("MANTENIMIENTO")}
-              >
-                Mantenimiento
-              </button>
+              {estadosDisponibles.map((nombre) => (
+                <button
+                  key={nombre}
+                  className={`camiones chip ${estadoFiltro === nombre ? "camiones active" : ""}`}
+                  onClick={() => setEstadoFiltro(nombre)}
+                >
+                  {nombre}
+                </button>
+              ))}
             </div>
 
             <label className="camiones checkbox">
@@ -324,9 +303,8 @@ export default function CamionesPage() {
           </div>
         </section>
 
-        {/* =========================
-            TABLA
-          ========================= */}
+        {error && <div className="camiones form-error">{error}</div>}
+
         <section className="camiones admin-table-section">
           <div className="camiones admin-table-top">
             <span>Mostrando {camionesFiltrados.length} camiones</span>
@@ -335,16 +313,18 @@ export default function CamionesPage() {
             </span>
           </div>
 
-          <CamionesTable
-            camiones={camionesFiltrados}
-            onEditar={abrirEditar}
-            onEliminar={eliminarCamion}
-          />
+          {loading ? (
+            <div className="camiones empty-state">Cargando camiones...</div>
+          ) : (
+            <CamionesTable
+              camiones={camionesFiltrados}
+              tiposCamion={tiposCamion}
+              onEditar={abrirEditar}
+              onEliminar={eliminarCamion}
+            />
+          )}
         </section>
 
-        {/* =========================
-            MODAL (Crear / Editar)
-          ========================= */}
         {modalOpen && (
           <div className="camiones modal-overlay" onMouseDown={cerrarModal}>
             <div className="camiones modal" onMouseDown={(e) => e.stopPropagation()}>
@@ -358,8 +338,9 @@ export default function CamionesPage() {
               <CamionForm
                 key={camionSeleccionado?.camion_id ?? "new"}
                 modo={modoForm}
-                tiposCamion={TIPOS_CAMION}
+                tiposCamion={tiposCamion}
                 camion={camionSeleccionado}
+                saving={saving}
                 onCancel={cerrarModal}
                 onSubmit={onSubmitForm}
               />
