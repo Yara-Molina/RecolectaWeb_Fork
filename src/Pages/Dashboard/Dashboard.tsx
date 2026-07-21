@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { FiAlertTriangle } from 'react-icons/fi';
 import MapaSuchiapa, { type CamionMapa } from './mapa/MapaSuchiapa';
+import { obtenerDireccion } from './mapa/geocodificacion';
+import { apiRequest, ApiError } from '../../services/api';
 import './Dashboard.css';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -30,6 +32,12 @@ interface Alerta {
   detalle: string;
   tipo: 'critica' | 'advertencia';
   tiempo: string;
+}
+
+interface PuntoRuta {
+  lat: number;
+  lng: number;
+  direccion: string;
 }
 
 // ─── Datos simulados ──────────────────────────────────────────────────────────
@@ -96,22 +104,70 @@ export default function Dashboard() {
   const [pagAlerta, setPagAlerta] = useState(0);
   const [rutaProgreso, setRutaProgreso] = useState<string>(RUTAS_INICIALES[0].id);
   const [modoRuta, setModoRuta] = useState(false);
-  const [puntosRuta, setPuntosRuta] = useState<[number, number][]>([]);
+  const [puntosRuta, setPuntosRuta] = useState<PuntoRuta[]>([]);
+  const [nombreRutaNueva, setNombreRutaNueva] = useState('');
+  const [guardandoRuta, setGuardandoRuta] = useState(false);
+  const [errorRuta, setErrorRuta] = useState<string | null>(null);
 
   const rutaSeleccionada = rutas.find(r => r.id === rutaProgreso) ?? rutas[0];
 
   const activarModoRuta = () => {
     setPuntosRuta([]);
+    setNombreRutaNueva('');
+    setErrorRuta(null);
     setModoRuta(true);
   };
 
   const cancelarModoRuta = () => {
     setModoRuta(false);
     setPuntosRuta([]);
+    setNombreRutaNueva('');
+    setErrorRuta(null);
   };
 
-  const agregarPuntoRuta = (punto: [number, number]) => {
-    setPuntosRuta(prev => [...prev, punto]);
+  const agregarPuntoRuta = async (punto: [number, number]) => {
+    const [lat, lng] = punto;
+    setPuntosRuta(prev => [...prev, { lat, lng, direccion: 'Buscando dirección…' }]);
+
+    const direccion = await obtenerDireccion(punto);
+
+    setPuntosRuta(prev =>
+      prev.map(p => (p.lat === lat && p.lng === lng ? { ...p, direccion: direccion || 'Sin dirección disponible' } : p)),
+    );
+  };
+
+  const guardarRuta = async () => {
+    if (!nombreRutaNueva.trim()) {
+      setErrorRuta('Ponle un nombre a la ruta antes de guardarla.');
+      return;
+    }
+
+    if (puntosRuta.length < 2) {
+      setErrorRuta('Selecciona al menos 2 puntos en el mapa.');
+      return;
+    }
+
+    setGuardandoRuta(true);
+    setErrorRuta(null);
+
+    try {
+      await apiRequest('/api/rutas/', {
+        method: 'POST',
+        body: JSON.stringify({
+          nombre: nombreRutaNueva.trim(),
+          descripcion: `Ruta creada desde el dashboard con ${puntosRuta.length} puntos.`,
+          json_ruta: JSON.stringify(
+            puntosRuta.map(p => ({ lat: p.lat, lng: p.lng, direccion: p.direccion })),
+          ),
+        }),
+      });
+
+      cancelarModoRuta();
+    } catch (err) {
+      setErrorRuta(err instanceof ApiError ? err.message : 'No se pudo guardar la ruta.');
+    } finally {
+      setGuardandoRuta(false);
+    }
   };
 
   const camionesMapa: CamionMapa[] = rutas.map(r => ({
@@ -178,20 +234,39 @@ return (
                 <button className="pager-btn" onClick={activarModoRuta}>Poner ruta</button>
               ) : (
                 <div className="mapa-ruta-acciones">
+                  <input
+                    className="mapa-ruta-nombre"
+                    placeholder="Nombre de la ruta"
+                    value={nombreRutaNueva}
+                    onChange={(e) => setNombreRutaNueva(e.target.value)}
+                  />
                   <span className="pager-info">{puntosRuta.length} puntos</span>
                   <button className="pager-btn" onClick={() => setPuntosRuta(prev => prev.slice(0, -1))} disabled={puntosRuta.length === 0}>Deshacer</button>
+                  <button className="pager-btn" onClick={guardarRuta} disabled={guardandoRuta}>
+                    {guardandoRuta ? 'Guardando…' : 'Guardar ruta'}
+                  </button>
                   <button className="pager-btn" onClick={cancelarModoRuta}>Cerrar</button>
                 </div>
               )}
             </div>
+            {errorRuta && <p className="mapa-ruta-error">{errorRuta}</p>}
             <div className={`mapa-wrap ${modoRuta ? 'mapa-wrap--expandido' : ''}`}>
               <MapaSuchiapa
                 camiones={camionesMapa}
                 seleccionable={modoRuta}
-                puntos={puntosRuta}
+                puntos={puntosRuta.map(p => [p.lat, p.lng] as [number, number])}
                 onAgregarPunto={agregarPuntoRuta}
               />
             </div>
+            {modoRuta && puntosRuta.length > 0 && (
+              <ul className="mapa-ruta-lista">
+                {puntosRuta.map((p, i) => (
+                  <li key={`${p.lat}-${p.lng}-${i}`}>
+                    <strong>{i + 1}.</strong> {p.direccion} <span className="mapa-ruta-coords">({p.lat.toFixed(5)}, {p.lng.toFixed(5)})</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {/* PROGRESO POR RUTA */}

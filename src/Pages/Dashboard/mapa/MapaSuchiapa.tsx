@@ -1,10 +1,9 @@
-import { MapContainer, TileLayer, Marker, Polyline, useMapEvents, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Coordenada } from './geo';
 import { SUCHIAPA_CENTER, SUCHIAPA_BOUNDS } from './constantes';
 import type { EstadoCamionMapa } from './IconosCamion';
-import { calcularRutaPorCalles } from './rutaPorCalles';
 
 interface CamionMapa {
   id: string;
@@ -58,25 +57,6 @@ function AjustarTamaño() {
 export default function MapaSuchiapa({ camiones, seleccionable, puntos = [], onAgregarPunto }: MapaSuchiapaProps) {
   void camiones;
 
-  const [rutaCalles, setRutaCalles] = useState<Coordenada[]>([]);
-
-  useEffect(() => {
-    if (puntos.length < 2) {
-      setRutaCalles([]);
-      return;
-    }
-
-    let cancelado = false;
-
-    calcularRutaPorCalles(puntos).then((resultado) => {
-      if (!cancelado) setRutaCalles(resultado);
-    });
-
-    return () => {
-      cancelado = true;
-    };
-  }, [puntos]);
-
   return (
     <MapContainer
       center={SUCHIAPA_CENTER}
@@ -99,10 +79,6 @@ export default function MapaSuchiapa({ camiones, seleccionable, puntos = [], onA
       {puntos.map((punto, index) => (
         <Marker key={index} position={punto} />
       ))}
-
-      {rutaCalles.length >= 2 && (
-        <Polyline positions={rutaCalles} pathOptions={{ color: '#0F676C', weight: 4 }} />
-      )}
     </MapContainer>
   );
 }
