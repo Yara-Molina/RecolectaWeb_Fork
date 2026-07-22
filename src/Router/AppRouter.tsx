@@ -24,6 +24,7 @@ import AdministracionLayout from "../Pages/Administracion/AdministracionLayout";
 import RellenosSanitariosPage from "../Pages/Administracion/RellenosSanitarios/RellenosSanitariosPage";
 import CamionesPage from "../Pages/Administracion/Camiones/CamionesPage";
 import EmpleadosPage from "../Pages/Administracion/Empleados/EmpleadosPage";
+import DispositivosPage from "../Pages/Administracion/Dispositivos/DispositivosPage";
 
 // Sin conectar todavía (ver src/Pages/_inactive/README.md)
 import DiasRecoleccionPage from "../Pages/_inactive/DiasRecoleccion/DiasRecoleccionPage";
@@ -136,6 +137,14 @@ export default function AppRouter() {
               element={
                 <RequireRole section="administracionEmpleados">
                   <EmpleadosPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="dispositivos"
+              element={
+                <RequireRole section="administracionDispositivos">
+                  <DispositivosPage />
                 </RequireRole>
               }
             />
