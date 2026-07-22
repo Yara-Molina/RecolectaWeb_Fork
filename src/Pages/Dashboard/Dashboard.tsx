@@ -1,9 +1,7 @@
 // Dashboard.tsx - Componente principal del dashboard de monitoreo de flota
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { FiAlertTriangle } from 'react-icons/fi';
-import camionRojo from '../../assets/camion-rojo.png';
-import camionNaranja from '../../assets/camion-naranja.png';
-import camionVerde from '../../assets/camion-verde.png';
+import MapaSuchiapa, { type CamionMapa } from './mapa/MapaSuchiapa';
 import { apiRequest } from '../../services/api';
 import { ROLES } from '../../services/auth';
 import './Dashboard.css';
@@ -97,11 +95,7 @@ function labelDisponibilidad(nombre: string): string {
   }
 }
 
-interface Posiciones {
-  [key: string]: { t: number };
-}
-
-// ─── Datos simulados ──────────────────────────────────────────────────────────
+// ─── Datos simulados (solo para el widget de progreso por ruta) ───────────────
 
 const RUTAS_INICIALES: Ruta[] = [
   { id: '01', nombre: 'Camión 1', conductor: '', estado: 'alerta',    progreso: 65,  color: '#E24B4A', badge: 'Detenido' },
@@ -109,38 +103,18 @@ const RUTAS_INICIALES: Ruta[] = [
   { id: '03', nombre: 'Camión 3', conductor: '',  estado: 'ok',         progreso: 100, color: '#639922', badge: 'Completado' },
 ];
 
-// Rutas en el SVG (viewBox 460x220). Cada array = waypoints [x, y]
-const MAP_PATHS: Record<string, number[][]> = {
-  '01': [[20,56],[65,56],[65,116],[160,116],[220,56],[270,56]],
-  '02': [[390,116],[270,116],[270,56],[165,56],[165,116],[65,116],[65,176]],
-  '03': [[20,176],[65,176],[165,176],[270,176],[380,176],[450,176]],
+// Rutas geográficas reales sobre Suchiapa, Chiapas. Cada array = waypoints [lat, lng]
+const RUTAS_GEO: Record<string, [number, number][]> = {
+  '01': [[16.6205, -93.1042], [16.6198, -93.1015], [16.6185, -93.0998], [16.617, -93.0985]],
+  '02': [[16.612, -93.108], [16.6135, -93.1055], [16.615, -93.103], [16.6166, -93.1005]],
+  '03': [[16.6095, -93.0965], [16.611, -93.098], [16.613, -93.0995], [16.615, -93.101]],
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function lerp(a: number, b: number, t: number): number { return a + (b - a) * t; }
-
-function getTruckPos(path: number[][], t: number): [number, number] {
-  const segs = path.length - 1;
-  const seg  = Math.min(Math.floor(t * segs), segs - 1);
-  const local = (t * segs) - seg;
-  const a = path[seg], b = path[seg + 1];
-  return [lerp(a[0], b[0], local), lerp(a[1], b[1], local)];
-}
-
-function buildPolylinePoints(path: number[][], t: number): string {
-  if (t >= 1) return path.map(p => p.join(',')).join(' ');
-  const segs = path.length - 1;
-  const end  = t * segs;
-  const seg  = Math.floor(end);
-  const local = end - seg;
-  const pts = path.slice(0, seg + 1).map(p => p.join(','));
-  if (seg < path.length - 1) {
-    const a = path[seg], b = path[seg + 1];
-    pts.push([lerp(a[0], b[0], local).toFixed(1), lerp(a[1], b[1], local).toFixed(1)].join(','));
-  }
-  return pts.join(' ');
-}
+const ESTADO_ICONO: Record<string, CamionMapa['estadoIcono']> = {
+  alerta: 'parado',
+  advertencia: 'retrasado',
+  ok: 'activo',
+};
 
 function pad(n: number): string { return String(n).padStart(2, '0'); }
 
@@ -156,122 +130,41 @@ function esHoy(fecha: string): boolean {
   return d.getFullYear() === hoy.getFullYear() && d.getMonth() === hoy.getMonth() && d.getDate() === hoy.getDate();
 }
 
-// ─── Mini mapa SVG ────────────────────────────────────────────────────────────
-
-function MiniMapa({ rutas }: { rutas: Ruta[] }) {
-  const [positions, setPositions] = useState<Posiciones>({
-    '01': { t: RUTAS_INICIALES[0].progreso / 100 },
-    '02': { t: RUTAS_INICIALES[1].progreso / 100 },
-    '03': { t: RUTAS_INICIALES[2].progreso / 100 },
-  });
-  const rafRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    function animate() {
-      setPositions(prev => {
-        const next = { ...prev };
-        // Solo los camiones 02 y 03 se mueven en ciclo continuo
-        // El camión 01 permanece en su posición inicial
-        next['02'] = { t: (prev['02'].t + 0.0015) % 1 }; // Ciclo continuo
-        next['03'] = { t: (prev['03'].t + 0.0012) % 1 }; // Ciclo continuo (velocidad ligeramente diferente)
-        return next;
-      });
-      rafRef.current = requestAnimationFrame(animate);
-    }
-    rafRef.current = requestAnimationFrame(animate);
-    return () => {
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-      }
-    };
-  }, []);
-
-  const estadoColor: Record<string, string> = { alerta: '#E24B4A', advertencia: '#BA7517', ok: '#639922' };
-
-  return (
-    <div className="mapa-wrap">
-      <svg viewBox="0 0 460 220" className="mapa-svg" xmlns="http://www.w3.org/2000/svg">
-        {/* Fondo */}
-        <rect width="460" height="220" fill="#e8eeea" />
-
-        {/* Calles horizontales */}
-        {[50, 110, 170].map(y => (
-          <rect key={y} x="0" y={y} width="460" height="12" fill="#d4dcd6" opacity=".7" />
-        ))}
-        {/* Calles verticales */}
-        {[60, 160, 270, 380].map(x => (
-          <rect key={x} x={x} y="0" width="10" height="220" fill="#d4dcd6" opacity=".7" />
-        ))}
-
-        {/* Manzanas */}
-        {[
-          [10,20,40,25],[80,20,70,25],[80,65,70,38],[175,20,85,25],[175,65,85,38],
-          [285,20,85,25],[285,65,85,38],[395,20,55,25],[80,125,70,38],[175,125,85,38],
-          [285,125,85,38],[395,125,55,38],[10,185,40,28],[80,185,70,28],[175,185,85,28],
-        ].map(([x,y,w,h], i) => (
-          <rect key={i} x={x} y={y} width={w} height={h} rx="3" fill="#c8d4ca" />
-        ))}
-
-        {/* Rutas trazadas */}
-        {rutas.map(r => {
-          const path = MAP_PATHS[r.id];
-          const t    = positions[r.id]?.t ?? r.progreso / 100;
-          const pts  = buildPolylinePoints(path, t);
-          const color = estadoColor[r.estado] ?? '#888';
-          return (
-            <polyline
-              key={r.id}
-              points={pts}
-              fill="none"
-              stroke={color}
-              strokeWidth="2.5"
-              strokeDasharray={r.estado === 'ok' ? 'none' : '5,3'}
-              opacity=".85"
-            />
-          );
-        })}
-
-        {/* Camiones */}
-        {rutas.map(r => {
-          const path = MAP_PATHS[r.id];
-          const t    = positions[r.id]?.t ?? r.progreso / 100;
-          const [cx, cy] = getTruckPos(path, t);
-          let camionImage = camionVerde;
-          if (r.id === '01') camionImage = camionRojo;
-          else if (r.id === '02') camionImage = camionNaranja;
-          return (
-            <image
-              key={r.id}
-              href={camionImage}
-              x={cx - 12}
-              y={cy - 8}
-              width="24"
-              height="16"
-              opacity="0.9"
-            />
-          );
-        })}
-      </svg>
-
-      {/* Leyenda */}
-      <div className="mapa-legend">
-        {rutas.map(r => (
-          <div key={r.id} className="mapa-legend-row">
-            <span className="mapa-legend-dot" style={{ background: estadoColor[r.estado] }} />
-            <span>{r.nombre} · {r.badge}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const [rutas]        = useState<Ruta[]>(RUTAS_INICIALES);
-  const [seleccionado, setSeleccionado] = useState<string | null>(null);
   const [ahora, setAhora]              = useState(new Date());
+  const [rutaProgreso, setRutaProgreso] = useState<string>(RUTAS_INICIALES[0].id);
+  const [modoRuta, setModoRuta] = useState(false);
+  const [puntosRuta, setPuntosRuta] = useState<[number, number][]>([]);
+  const [seleccionado, setSeleccionado] = useState<string | null>(null);
+
+  const rutaSeleccionada = rutas.find(r => r.id === rutaProgreso) ?? rutas[0];
+
+  const activarModoRuta = () => {
+    setPuntosRuta([]);
+    setModoRuta(true);
+  };
+
+  const cancelarModoRuta = () => {
+    setModoRuta(false);
+    setPuntosRuta([]);
+  };
+
+  const agregarPuntoRuta = (punto: [number, number]) => {
+    setPuntosRuta(prev => [...prev, punto]);
+  };
+
+  const camionesMapa: CamionMapa[] = rutas.map(r => ({
+    id: r.id,
+    nombre: r.nombre,
+    color: r.color,
+    estadoIcono: ESTADO_ICONO[r.estado] ?? 'activo',
+    ruta: RUTAS_GEO[r.id] ?? [],
+  }));
+
+  const barColor: Record<string, string> = { alerta: '#E24B4A', advertencia: '#BA7517', ok: '#639922' };
 
   const [anomalias, setAnomalias] = useState<Anomalia[]>([]);
   const [loadingAnomalias, setLoadingAnomalias] = useState(true);
@@ -283,7 +176,7 @@ export default function Dashboard() {
 
   const [rutasFiltro, setRutasFiltro] = useState<RutaFiltro[]>([]);
   const [rutaCamionLinks, setRutaCamionLinks] = useState<RutaCamionLink[]>([]);
-  const [rutaSeleccionada, setRutaSeleccionada] = useState<number | 'todas'>('todas');
+  const [rutaFiltroId, setRutaFiltroId] = useState<number | 'todas'>('todas');
 
   const [asignacionesActivas, setAsignacionesActivas] = useState<AsignacionActiva[]>([]);
   const [conductores, setConductores] = useState<ConductorDashboard[]>([]);
@@ -402,11 +295,11 @@ export default function Dashboard() {
   const estadoDotClass: Record<string, string>   = { alerta: 'sdot-err',  advertencia: 'sdot-warn',  ok: 'sdot-ok'  };
 
   const camionIdsDeRuta =
-    rutaSeleccionada === 'todas'
+    rutaFiltroId === 'todas'
       ? null
       : new Set(
           rutaCamionLinks
-            .filter(v => v.ruta_id === rutaSeleccionada && !v.eliminado)
+            .filter(v => v.ruta_id === rutaFiltroId && !v.eliminado)
             .map(v => v.camion_id)
         );
 
@@ -470,10 +363,57 @@ return (
       {/* GRID PRINCIPAL */}
       <div className="dash-main-grid">
 
-        {/* MAPA */}
-        <div className="card">
-          <h2 className="card-title">Mapa de rutas · Tiempo real</h2>
-          <MiniMapa rutas={rutas} />
+        {/* COLUMNA IZQUIERDA: MAPA + PROGRESO */}
+        <div className="left-column">
+          <div className={`card ${modoRuta ? 'card--mapa-expandido' : ''}`}>
+            <div className="card-title card-title--flex">
+              <span>Mapa de rutas · Tiempo real</span>
+              {!modoRuta ? (
+                <button className="pager-btn" onClick={activarModoRuta}>Poner ruta</button>
+              ) : (
+                <div className="mapa-ruta-acciones">
+                  <span className="pager-info">{puntosRuta.length} puntos</span>
+                  <button className="pager-btn" onClick={() => setPuntosRuta(prev => prev.slice(0, -1))} disabled={puntosRuta.length === 0}>Deshacer</button>
+                  <button className="pager-btn" onClick={cancelarModoRuta}>Cerrar</button>
+                </div>
+              )}
+            </div>
+            <div className={`mapa-wrap ${modoRuta ? 'mapa-wrap--expandido' : ''}`}>
+              <MapaSuchiapa
+                camiones={camionesMapa}
+                seleccionable={modoRuta}
+                puntos={puntosRuta}
+                onAgregarPunto={agregarPuntoRuta}
+              />
+            </div>
+          </div>
+
+          {/* PROGRESO POR RUTA */}
+          <div className="card">
+            <div className="card-title card-title--flex">
+              <span>Progreso por ruta</span>
+              <select
+                className="camion-selector"
+                value={rutaProgreso}
+                onChange={(e) => setRutaProgreso(e.target.value)}
+              >
+                {rutas.map(r => (
+                  <option key={r.id} value={r.id}>{r.nombre}</option>
+                ))}
+              </select>
+            </div>
+            <div className="ruta-bar">
+              <div className="ruta-bar-top">
+                <span className="rlbl">
+                  Ruta {rutaSeleccionada.id === '01' ? 'A' : rutaSeleccionada.id === '02' ? 'B' : 'C'} · {rutaSeleccionada.nombre}
+                </span>
+                <span className="rpct">{rutaSeleccionada.progreso}%</span>
+              </div>
+              <div className="rtrack">
+                <div className="rfill" style={{ width: `${rutaSeleccionada.progreso}%`, background: barColor[rutaSeleccionada.estado] }} />
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* COLUMNA DERECHA */}
@@ -485,8 +425,8 @@ return (
               <h2 className="card-title">Camiones</h2>
               <select
                 className="ruta-filter-select"
-                value={rutaSeleccionada}
-                onChange={(e) => setRutaSeleccionada(e.target.value === 'todas' ? 'todas' : Number(e.target.value))}
+                value={rutaFiltroId}
+                onChange={(e) => setRutaFiltroId(e.target.value === 'todas' ? 'todas' : Number(e.target.value))}
               >
                 <option value="todas">Todas las rutas</option>
                 {rutasFiltro.map(r => (
@@ -502,7 +442,7 @@ return (
                 <p className="alerta-detalle" style={{ padding: '8px 4px' }}>{errorCamiones}</p>
               ) : camionesFiltrados.length === 0 ? (
                 <p className="alerta-detalle" style={{ padding: '8px 4px' }}>
-                  {rutaSeleccionada === 'todas' ? 'No hay camiones registrados.' : 'No hay camiones asignados a esta ruta.'}
+                  {rutaFiltroId === 'todas' ? 'No hay camiones registrados.' : 'No hay camiones asignados a esta ruta.'}
                 </p>
               ) : (
                 camionesFiltrados.map(c => {
