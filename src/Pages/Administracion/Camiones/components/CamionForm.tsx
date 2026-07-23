@@ -46,6 +46,8 @@ export default function CamionForm({ modo, camion, tiposCamion, saving = false, 
 
     if (!placa.trim()) return setError("La placa es obligatoria.");
     if (!modelo.trim()) return setError("El modelo es obligatorio.");
+    if (modelo.trim().length < 50) return setError("El modelo debe tener al menos 50 caracteres.");
+    if (modelo.trim().length > 100) return setError("El modelo no puede superar 100 caracteres.");
     if (!tipoCamionId) return setError("El tipo de camión es obligatorio.");
 
     onSubmit({
@@ -79,7 +81,8 @@ export default function CamionForm({ modo, camion, tiposCamion, saving = false, 
             value={modelo}
             onChange={(e) => setModelo(e.target.value)}
             placeholder="Freightliner M2 2020"
-            maxLength={50}
+            minLength={50}
+            maxLength={100}
           />
         </div>
 

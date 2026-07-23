@@ -21,7 +21,22 @@ export default function DispositivosTable({
   onDesvincular,
 }: Props) {
   if (data.length === 0) {
-    return <div className="disp-loading">No hay dispositivos pendientes para mostrar.</div>;
+    return (
+      <div className="disp-empty-state">
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>📱</div>
+        <h3>No hay solicitudes pendientes</h3>
+        <p>Cuando un conductor solicite vincular su dispositivo desde la app móvil, aparecerá aquí para su aprobación.</p>
+        <div style={{ marginTop: '24px', padding: '16px', backgroundColor: '#f8f9fa', borderRadius: '8px', textAlign: 'left', maxWidth: '500px', margin: '24px auto 0' }}>
+          <p style={{ fontSize: '14px', marginBottom: '8px', fontWeight: 'bold' }}>📋 Flujo de vinculación:</p>
+          <ol style={{ fontSize: '14px', paddingLeft: '20px', margin: '0' }}>
+            <li>El conductor inicia sesión en la app móvil</li>
+            <li>La app detecta que el dispositivo no está vinculado</li>
+            <li>El conductor toca "Vincular dispositivo"</li>
+            <li>La solicitud aparece aquí para aprobar o desvincular</li>
+          </ol>
+        </div>
+      </div>
+    );
   }
 
   return (
