@@ -16,6 +16,8 @@ export default defineConfig(({ command, mode }) => {
     env.VITE_API_URL ||
     "http://localhost:8081";
 
+  const rutasApiTarget = env.API_RUTA_URL || "http://localhost:8004";
+
   if (isServing && mode === "production" && allowAllHosts) {
     throw new Error("ALLOW_ALL_HOSTS no puede estar habilitado en produccion.");
   }
@@ -37,6 +39,18 @@ export default defineConfig(({ command, mode }) => {
       host: "0.0.0.0",
       allowedHosts,
       proxy: {
+        "/rutas": {
+          target: rutasApiTarget,
+          changeOrigin: true,
+        },
+        "/puntos-recoleccion": {
+          target: rutasApiTarget,
+          changeOrigin: true,
+        },
+        "/optimizar": {
+          target: rutasApiTarget,
+          changeOrigin: true,
+        },
         "/api": {
           target: proxyTarget,
           changeOrigin: true,
@@ -53,6 +67,18 @@ export default defineConfig(({ command, mode }) => {
       host: "0.0.0.0",
       allowedHosts,
       proxy: {
+        "/rutas": {
+          target: rutasApiTarget,
+          changeOrigin: true,
+        },
+        "/puntos-recoleccion": {
+          target: rutasApiTarget,
+          changeOrigin: true,
+        },
+        "/optimizar": {
+          target: rutasApiTarget,
+          changeOrigin: true,
+        },
         "/api": {
           target: proxyTarget,
           changeOrigin: true,

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { FiAlertTriangle } from 'react-icons/fi';
 import MapaSuchiapa, { type CamionMapa } from './mapa/MapaSuchiapa';
-import { obtenerDireccion } from './mapa/geocodificacion';
+import { obtenerDireccionCompleta, type DireccionCompleta } from './mapa/geocodificacion';
 import { apiRequest, ApiError } from '../../services/api';
 import './Dashboard.css';
 
@@ -38,7 +38,38 @@ interface PuntoRuta {
   lat: number;
   lng: number;
   direccion: string;
+  direccionCompleta: DireccionCompleta | null;
 }
+
+interface DireccionCompleta {
+  display_name: string;
+  calle?: string | null;
+  cp?: string | null;
+  colonia?: string | null;
+  municipio?: string | null;
+  estado?: string | null;
+}
+
+interface Conductor {
+  id: number;
+  nombre: string;
+  email: string;
+}
+
+// Base de inicio fija (Laredo Texas, Suchiapa)
+const BASE_INICIO: PuntoRuta = {
+  lat: 16.62910,
+  lng: -93.10414,
+  direccion: 'BASE INICIAL: Laredo Texas, Suchiapa, Chiapas, 29150, México',
+  direccionCompleta: {
+    display_name: 'Laredo Texas, Suchiapa, Chiapas, 29150, México',
+    calle: 'Laredo Texas',
+    cp: '29150',
+    colonia: null,
+    municipio: 'Suchiapa',
+    estado: 'Chiapas'
+  }
+};
 
 // ─── Datos simulados ──────────────────────────────────────────────────────────
 
@@ -106,13 +137,15 @@ export default function Dashboard() {
   const [modoRuta, setModoRuta] = useState(false);
   const [puntosRuta, setPuntosRuta] = useState<PuntoRuta[]>([]);
   const [nombreRutaNueva, setNombreRutaNueva] = useState('');
+  const [conductorSeleccionado, setConductorSeleccionado] = useState<number | null>(12); // Francisco Castro ID 12 por defecto
+  const [conductores, setConductores] = useState<Conductor[]>([]);
   const [guardandoRuta, setGuardandoRuta] = useState(false);
   const [errorRuta, setErrorRuta] = useState<string | null>(null);
 
   const rutaSeleccionada = rutas.find(r => r.id === rutaProgreso) ?? rutas[0];
 
   const activarModoRuta = () => {
-    setPuntosRuta([]);
+    setPuntosRuta([BASE_INICIO]); // Siempre empieza con la base de inicio
     setNombreRutaNueva('');
     setErrorRuta(null);
     setModoRuta(true);
@@ -127,12 +160,22 @@ export default function Dashboard() {
 
   const agregarPuntoRuta = async (punto: [number, number]) => {
     const [lat, lng] = punto;
-    setPuntosRuta(prev => [...prev, { lat, lng, direccion: 'Buscando dirección…' }]);
+    
+    // No permitir agregar más puntos si se hace clic en la base de inicio
+    if (lat === BASE_INICIO.lat && lng === BASE_INICIO.lng) {
+      return;
+    }
 
-    const direccion = await obtenerDireccion(punto);
+    setPuntosRuta(prev => [...prev, { lat, lng, direccion: 'Buscando dirección…', direccionCompleta: null }]);
+
+    const direccionCompleta = await obtenerDireccionCompleta(punto);
 
     setPuntosRuta(prev =>
-      prev.map(p => (p.lat === lat && p.lng === lng ? { ...p, direccion: direccion || 'Sin dirección disponible' } : p)),
+      prev.map(p => (p.lat === lat && p.lng === lng ? { 
+        ...p, 
+        direccion: direccionCompleta?.display_name || 'Sin dirección disponible',
+        direccionCompleta 
+      } : p)),
     );
   };
 
@@ -143,7 +186,12 @@ export default function Dashboard() {
     }
 
     if (puntosRuta.length < 2) {
-      setErrorRuta('Selecciona al menos 2 puntos en el mapa.');
+      setErrorRuta('Selecciona al menos 1 punto además de la base inicial.');
+      return;
+    }
+
+    if (!conductorSeleccionado) {
+      setErrorRuta('Cargando información del conductor, espera un momento...');
       return;
     }
 
@@ -151,19 +199,125 @@ export default function Dashboard() {
     setErrorRuta(null);
 
     try {
-      await apiRequest('/api/rutas/', {
+      // Preparar base_inicio y base_fin para el AG
+      const baseInicio = {
+        lat: BASE_INICIO.lat,
+        lng: BASE_INICIO.lng,
+        nombre: 'Base Inicio'
+      };
+
+      // El último punto será la base de fin
+      const ultimoPunto = puntosRuta[puntosRuta.length - 1];
+      const baseFin = {
+        lat: ultimoPunto.lat,
+        lng: ultimoPunto.lng,
+        nombre: 'Base Fin'
+      };
+
+      const conductorNombre = conductores.find(c => c.id === conductorSeleccionado)?.nombre || 'Francisco Castro';
+
+      // Construir array completo de puntos con toda la info (lat, lng, direccion, calle...)
+      const puntosCompletos = puntosRuta.map((p, i) => {
+        const esBaseInicio = i === 0;
+        const esBaseFin = i === puntosRuta.length - 1;
+        const dir = p.direccionCompleta;
+        return {
+          id: i + 1,
+          orden: i + 1,
+          lat: p.lat,
+          lng: p.lng,
+          nombre: p.direccion || `Punto ${i + 1}`,
+          direccion: p.direccion,
+          calle: dir?.calle || null,
+          colonia: dir?.colonia || null,
+          municipio: dir?.municipio || null,
+          estado: dir?.estado || null,
+          cp: dir?.cp || null,
+          es_inicio: esBaseInicio,
+          es_fin: esBaseFin,
+        };
+      });
+
+      console.log('Guardando ruta:', nombreRutaNueva, 'con', puntosRuta.length, 'puntos');
+      console.log('Asignada a:', conductorNombre, '(ID:', conductorSeleccionado, ')');
+      console.log('Puntos completos:', JSON.stringify(puntosCompletos, null, 2));
+
+      // 1. Crear la ruta con conductor asignado y TODOS los puntos en json_ruta
+      const rutaResponse = await apiRequest<{ success: boolean; data: { ruta_id: number } }>('/rutas/', {
         method: 'POST',
         body: JSON.stringify({
           nombre: nombreRutaNueva.trim(),
-          descripcion: `Ruta creada desde el dashboard con ${puntosRuta.length} puntos.`,
-          json_ruta: JSON.stringify(
-            puntosRuta.map(p => ({ lat: p.lat, lng: p.lng, direccion: p.direccion })),
-          ),
+          descripcion: `Ruta creada desde el dashboard con ${puntosRuta.length} puntos. Asignada a ${conductorNombre}.`,
+          conductor_id: conductorSeleccionado,
+          json_ruta: {
+            type: 'LineString',
+            coordinates: puntosRuta.map(p => [p.lng, p.lat]),
+            puntos: puntosCompletos, // Todos los puntos con lat, lng, direccion
+            base_inicio: baseInicio,
+            base_fin: baseFin
+          },
         }),
       });
 
+      console.log('Ruta creada:', rutaResponse);
+      const rutaId = rutaResponse.data.ruta_id;
+
+      // 2. Crear los puntos de recolección con toda la información
+      console.log('Creando puntos de recolección para ruta', rutaId);
+      for (let i = 0; i < puntosRuta.length; i++) {
+        const punto = puntosRuta[i];
+        const esBaseInicio = i === 0;
+        const esBaseFin = i === puntosRuta.length - 1;
+        
+        let nombrePunto = punto.direccion || `Punto ${i + 1}`;
+        if (esBaseInicio) nombrePunto = 'BASE INICIO: ' + nombrePunto;
+        if (esBaseFin) nombrePunto = 'BASE FIN: ' + nombrePunto;
+
+        const dir = punto.direccionCompleta;
+
+        await apiRequest('/puntos-recoleccion/', {
+          method: 'POST',
+          body: JSON.stringify({
+            ruta_id: rutaId,
+            orden: i + 1,
+            nombre: nombrePunto,
+            direccion: punto.direccion,
+            lat: punto.lat,
+            lon: punto.lng, // La BD usa 'lon', no 'lng'
+            calle: dir?.calle || null,
+            colonia: dir?.colonia || null,
+            municipio: dir?.municipio || null,
+            estado: dir?.estado || null,
+            cp: dir?.cp || null,
+            es_inicio: esBaseInicio,
+            es_fin: esBaseFin,
+          }),
+        });
+      }
+
+      console.log('Ruta y puntos guardados exitosamente');
+
+      // 3. Optimizar la ruta con el AG (algoritmo genético)
+      console.log('Optimizando ruta con AG...');
+      try {
+        const optimizacion = await apiRequest<{ success: boolean; message: string; data: any }>(`/optimizar/ruta/${rutaId}`, {
+          method: 'POST',
+        });
+        console.log('Ruta optimizada por AG:', optimizacion);
+        
+        if (optimizacion.success) {
+          alert(`✓ Ruta "${nombreRutaNueva}" guardada y OPTIMIZADA con ${puntosRuta.length} puntos\n\nAsignada a: ${conductorNombre}\nDistancia: ${optimizacion.data?.distancia_total_km || 'N/A'} km\nBase inicio: Laredo Texas\nBase fin: ${ultimoPunto.direccion}`);
+        } else {
+          alert(`✓ Ruta "${nombreRutaNueva}" guardada con ${puntosRuta.length} puntos\n\n⚠ No se pudo optimizar (AG no disponible)\nAsignada a: ${conductorNombre}`);
+        }
+      } catch (optErr) {
+        console.warn('No se pudo optimizar con AG:', optErr);
+        alert(`✓ Ruta "${nombreRutaNueva}" guardada con ${puntosRuta.length} puntos\n\n⚠ No se optimizó (AG no disponible, revisa que esté corriendo en puerto 8003)\nAsignada a: ${conductorNombre}`);
+      }
+
       cancelarModoRuta();
     } catch (err) {
+      console.error('Error guardando ruta:', err);
       setErrorRuta(err instanceof ApiError ? err.message : 'No se pudo guardar la ruta.');
     } finally {
       setGuardandoRuta(false);
@@ -200,6 +354,44 @@ export default function Dashboard() {
   useEffect(() => {
     setPagAlerta(0);
   }, [filtroCamion]);
+
+  // Cargar conductores desde la API principal y seleccionar Francisco por defecto
+  useEffect(() => {
+    const cargarConductores = async () => {
+      try {
+        const response = await apiRequest<{ success: boolean; data: Array<{id: number; nombre: string; apellido: string; email: string; rol_id: number}> }>('/api/empleados');
+        if (response.success && response.data) {
+          // Filtrar solo conductores (rol_id === 2)
+          const listaConductores = response.data
+            .filter((emp: any) => emp.rol_id === 2)
+            .map((emp: any) => ({
+              id: emp.id,
+              nombre: `${emp.nombre} ${emp.apellido}`.trim(),
+              email: emp.email
+            }));
+          setConductores(listaConductores);
+          
+          // Buscar francisco.castro@recolecta.mx por ID o email
+          const francisco = listaConductores.find((c: Conductor) => c.id === 12 || c.email === 'francisco.castro@recolecta.mx');
+          if (francisco) {
+            setConductorSeleccionado(francisco.id);
+            console.log('Francisco Castro asignado automáticamente:', francisco);
+          } else {
+            // Si no se encuentra en la lista, usar directamente el ID 12
+            setConductorSeleccionado(12);
+            console.log('Francisco Castro asignado con ID fijo: 12');
+          }
+        }
+      } catch (err) {
+        console.error('Error cargando conductores:', err);
+        // Si falla la carga, usar el ID 12 directamente
+        setConductorSeleccionado(12);
+        console.log('Usando conductor Francisco Castro con ID 12 (fallback)');
+      }
+    };
+    
+    cargarConductores();
+  }, []);
 
   const barColor: Record<string, string> = { alerta: '#E24B4A', advertencia: '#BA7517', ok: '#639922' };
 
@@ -241,7 +433,7 @@ return (
                     onChange={(e) => setNombreRutaNueva(e.target.value)}
                   />
                   <span className="pager-info">{puntosRuta.length} puntos</span>
-                  <button className="pager-btn" onClick={() => setPuntosRuta(prev => prev.slice(0, -1))} disabled={puntosRuta.length === 0}>Deshacer</button>
+                  <button className="pager-btn" onClick={() => setPuntosRuta(prev => prev.slice(0, -1))} disabled={puntosRuta.length <= 1}>Deshacer</button>
                   <button className="pager-btn" onClick={guardarRuta} disabled={guardandoRuta}>
                     {guardandoRuta ? 'Guardando…' : 'Guardar ruta'}
                   </button>

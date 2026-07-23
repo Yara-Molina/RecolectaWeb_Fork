@@ -799,6 +799,22 @@
   min-width: 180px;
 }
 
+.mapa-ruta-conductor {
+  font-size: 13px;
+  border: 1px solid rgba(15, 103, 108, 0.3);
+  border-radius: 8px;
+  padding: 6px 10px;
+  outline: none;
+  min-width: 200px;
+  background-color: white;
+  cursor: pointer;
+}
+
+.mapa-ruta-conductor:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
 .mapa-ruta-nombre:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-light);

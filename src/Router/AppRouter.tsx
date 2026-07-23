@@ -23,6 +23,7 @@ import RellenosSanitariosPage from "../Pages/Administracion/RellenosSanitarios/R
 import CamionesPage from "../Pages/Administracion/Camiones/CamionesPage";
 import DiasRecoleccionPage from "../Pages/Administracion/DiasRecoleccion/DiasRecoleccionPage";
 import EmpleadosPage from "../Pages/Administracion/Empleados/EmpleadosPage";
+import DispositivosPage from "../Pages/Administracion/Dispositivos/DispositivosPage";
 
 // Layout global (Navbar + contenido)
 function AppLayout() {
@@ -132,6 +133,14 @@ export default function AppRouter() {
               element={
                 <RequireRole section="administracionEmpleados">
                   <EmpleadosPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="dispositivos"
+              element={
+                <RequireRole section="administracionDispositivos">
+                  <DispositivosPage />
                 </RequireRole>
               }
             />
