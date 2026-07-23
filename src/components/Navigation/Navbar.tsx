@@ -91,19 +91,6 @@ export default function Navbar() {
                 >
                   {item.label}
                 </NavLink>
-                {item.id === 'dashboard' && (
-                  // /mapa/ es una SPA aparte (map-view) servida por nginx
-                  // junto a este frontend, no una ruta de este React Router:
-                  // por eso es un <a> normal y no un <NavLink>.
-                  <a
-                    href="/mapa/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="anomalias-nav-link"
-                  >
-                    Mapa
-                  </a>
-                )}
               </Fragment>
             ))}
           </div>
