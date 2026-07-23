@@ -350,3 +350,24 @@
     align-items: stretch;
   }
 }
+
+.disp-empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(36, 69, 54, 0.12);
+  border-radius: 16px;
+}
+
+.disp-empty-state h3 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #183427;
+}
+
+.disp-empty-state p {
+  margin: 0;
+  color: #5b6d63;
+  font-size: 14px;
+}
