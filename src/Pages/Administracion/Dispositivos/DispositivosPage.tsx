@@ -71,7 +71,13 @@ export default function DispositivosPage() {
       const response = await apiRequest<{ data: unknown[] }>("/api/dispositivos/pendientes");
       setDispositivos((response.data ?? []).map(normalizarDispositivo));
     } catch (err) {
-      setError(mensajeError(err, "No se pudieron cargar las solicitudes de vinculación."));
+      if (err instanceof ApiError && err.status === 404) {
+        // El endpoint no existe en el backend, mostrar array vacío
+        setDispositivos([]);
+        setError(null);
+      } else {
+        setError(mensajeError(err, "No se pudieron cargar las solicitudes de vinculación."));
+      }
     } finally {
       setLoading(false);
     }
