@@ -1,6 +1,6 @@
 // DiasRecoleccionPage.tsx
 import { useMemo, useState } from "react";
-import "./diasRecoleccion.css";
+import "./DiasRecoleccion.css";
 
 import DiasRecoleccionTable from "./components/ConfigTable";
 import DiasRecoleccionForm from "./components/DiasSelector";
