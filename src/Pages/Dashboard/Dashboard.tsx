@@ -133,7 +133,7 @@ export default function Dashboard() {
   const rutaSeleccionada = rutas.find(r => r.id === rutaProgreso) ?? rutas[0];
 
   const activarModoRuta = () => {
-    setPuntosRuta([BASE_INICIO]);
+    setPuntosRuta([]);
     setNombreRutaNueva('');
     setErrorRuta(null);
     setModoRuta(true);
@@ -148,7 +148,6 @@ export default function Dashboard() {
 
   const agregarPuntoRuta = async (punto: [number, number]) => {
     const [lat, lng] = punto;
-    if (lat === BASE_INICIO.lat && lng === BASE_INICIO.lng) return;
 
     setPuntosRuta(prev => [...prev, { lat, lng, direccion: 'Buscando direccion...', direccionCompleta: null }]);
 
@@ -170,7 +169,7 @@ export default function Dashboard() {
     }
 
     if (puntosRuta.length < 2) {
-      setErrorRuta('Selecciona al menos 1 punto ademas de la base inicial.');
+      setErrorRuta('Selecciona al menos 2 puntos para crear la ruta.');
       return;
     }
 
@@ -183,7 +182,8 @@ export default function Dashboard() {
     setErrorRuta(null);
 
     try {
-      const baseInicio = { lat: BASE_INICIO.lat, lng: BASE_INICIO.lng, nombre: 'Base Inicio' };
+      const primerPunto = puntosRuta[0];
+      const baseInicio = { lat: primerPunto.lat, lng: primerPunto.lng, nombre: 'Base Inicio' };
       const ultimoPunto = puntosRuta[puntosRuta.length - 1];
       const baseFin = { lat: ultimoPunto.lat, lng: ultimoPunto.lng, nombre: 'Base Fin' };
 
