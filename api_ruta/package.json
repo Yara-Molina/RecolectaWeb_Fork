@@ -1,16 +1,17 @@
 {
   "name": "api_ruta",
   "version": "1.0.0",
-  "private": true,
-  "type": "commonjs",
+  "description": "Microservicio de rutas de recoleccion (solo rutas, sin usuarios)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node --watch server.js"
   },
   "dependencies": {
+    "axios": "^1.6.0",
     "cors": "^2.8.5",
     "express": "^4.19.2",
+    "mysql2": "^3.11.0",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1"
   }

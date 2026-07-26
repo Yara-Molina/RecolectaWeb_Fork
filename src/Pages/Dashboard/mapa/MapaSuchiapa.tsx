@@ -80,8 +80,8 @@ export default function MapaSuchiapa({ camiones, seleccionable, puntos = [], onA
   return (
     <MapContainer
       center={SUCHIAPA_CENTER}
-      zoom={14}
-      minZoom={13}
+      zoom={13}
+      minZoom={12}
       maxZoom={18}
       maxBounds={SUCHIAPA_BOUNDS as [number, number][]}
       maxBoundsViscosity={1.0}
