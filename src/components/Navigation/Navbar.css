@@ -125,11 +125,95 @@
   transition: var(--anomalias-nav-transition, all 0.3s ease);
   position: relative;
   box-shadow: 0 4px 12px rgba(15, 103, 108, 0.2);
+  border: none;
+  cursor: pointer;
 }
 
 .anomalias-nav-user-icon:hover {
   transform: scale(1.05);
   box-shadow: 0 6px 20px rgba(15, 103, 108, 0.3);
+}
+
+/* POPOVER DE USUARIO - anclado al icono de perfil */
+.anomalias-navbar-right {
+  position: relative;
+}
+
+.anomalias-user-modal {
+  position: absolute;
+  top: calc(100% + 16px);
+  right: 0;
+  width: 220px;
+  background: var(--anomalias-nav-bg, #ffffff);
+  border-radius: var(--anomalias-nav-radius, 12px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--anomalias-nav-border, #e0e0e0);
+  padding: 20px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  z-index: 1100;
+  animation: anomalias-fadeIn 0.18s ease-out;
+}
+
+.anomalias-user-modal::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  right: 16px;
+  width: 14px;
+  height: 14px;
+  background: var(--anomalias-nav-bg, #ffffff);
+  border-top: 1px solid var(--anomalias-nav-border, #e0e0e0);
+  border-left: 1px solid var(--anomalias-nav-border, #e0e0e0);
+  transform: rotate(45deg) translateY(7px);
+}
+
+.anomalias-user-modal-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--anomalias-nav-primary, #0F676C), #0a4a4e);
+  color: white;
+  font-size: 24px;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 12px rgba(15, 103, 108, 0.25);
+}
+
+.anomalias-user-modal-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--anomalias-nav-text, #2d3748);
+  word-break: break-word;
+}
+
+.anomalias-user-modal-role {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--anomalias-nav-text-light, #718096);
+  margin-bottom: 16px;
+}
+
+.anomalias-user-modal-logout {
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--anomalias-nav-primary, #0F676C);
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--anomalias-nav-transition, all 0.3s ease);
+}
+
+.anomalias-user-modal-logout:hover {
+  background: #0a4a4e;
+  box-shadow: 0 4px 12px rgba(15, 103, 108, 0.25);
 }
 
 /* QUITAR EL PUNTO VERDE DE NOTIFICACIONES */

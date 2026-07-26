@@ -1,8 +1,8 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useState, useEffect, useMemo } from 'react';
+import { Fragment, useState, useEffect, useMemo, useRef } from 'react';
 import './Navbar.css';
 import Logo from '../../Assets/Logo.png';
-import { clearSession } from '../../services/api';
+import { clearSession, getUserName } from '../../services/api';
 import { canAccess, roleName, type SectionKey } from '../../services/auth';
 
 interface NavItem {
@@ -14,6 +14,8 @@ interface NavItem {
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
+  const [userModalOpen, setUserModalOpen] = useState(false);
+  const userModalRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -25,10 +27,32 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  useEffect(() => {
+    if (!userModalOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setUserModalOpen(false);
+    };
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userModalRef.current && !userModalRef.current.contains(event.target as Node)) {
+        setUserModalOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [userModalOpen]);
+
   const allNavItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', path: '/dashboard', section: 'dashboard' },
     { id: 'historial', label: 'Historial', path: '/historial', section: 'historial' },
-    { id: 'alertas', label: 'Alertas', path: '/alertas', section: 'alertas' },
+    // Alertas: oculta del navbar por decisión de producto, la ruta y la
+    // vista se dejan intactas.
     { id: 'anomalias', label: 'Anomalias', path: '/anomalias', section: 'anomalias' },
     { id: 'Puntos_de_ruta', label: 'Puntos de Ruta', path: '/estado-ruta', section: 'estadoRuta' },
     // Validación de Recolección: oculta del navbar por ahora (pendiente de
@@ -40,9 +64,12 @@ export default function Navbar() {
   const navItems = useMemo(() => allNavItems.filter((item) => !item.section || canAccess(item.section)), []);
 
   const handleLogout = () => {
+    setUserModalOpen(false);
     clearSession();
     navigate('/login');
   };
+
+  const userName = getUserName();
 
   return (
     <div className="anomalias-nav-container">
@@ -55,29 +82,46 @@ export default function Navbar() {
 
           <div className="anomalias-navbar-center">
             {navItems.map((item) => (
-              <NavLink
-                key={item.id}
-                to={item.path}
-                className={({ isActive }) =>
-                  `anomalias-nav-link ${isActive ? 'active' : ''}`
-                }
-              >
-                {item.label}
-              </NavLink>
+              <Fragment key={item.id}>
+                <NavLink
+                  to={item.path}
+                  className={({ isActive }) =>
+                    `anomalias-nav-link ${isActive ? 'active' : ''}`
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              </Fragment>
             ))}
           </div>
 
-          <div className="anomalias-navbar-right">
-            <span style={{ marginRight: 12, fontSize: 13, opacity: 0.85 }}>{roleName()}</span>
+          <div className="anomalias-navbar-right" ref={userModalRef}>
             <button
               type="button"
-              onClick={handleLogout}
+              onClick={() => setUserModalOpen((open) => !open)}
               className="anomalias-nav-user-icon"
-              style={{ cursor: 'pointer', border: 'none', background: 'transparent' }}
-              title="Cerrar sesión"
+              title="Cuenta"
+              aria-haspopup="dialog"
+              aria-expanded={userModalOpen}
             >
               👤
             </button>
+
+            {userModalOpen && (
+              <div className="anomalias-user-modal" role="dialog" aria-modal="true">
+                <div className="anomalias-user-modal-avatar">👤</div>
+                <div className="anomalias-user-modal-name">{userName ?? 'Usuario'}</div>
+                <div className="anomalias-user-modal-role">{roleName()}</div>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="anomalias-user-modal-logout"
+                >
+                  Cerrar sesión
+                </button>
+              </div>
+            )}
           </div>
 
         </div>

@@ -15,6 +15,21 @@ export default defineConfig(({ command, mode }) => {
     env.VITE_API_PROXY_TARGET ||
     env.VITE_API_URL ||
     "http://localhost:8081";
+  // map-view corre como su propio proyecto Vite (npm run dev dentro de
+  // map-view/); en produccion nginx lo sirve en /mapa (ver
+  // docker/nginx/nginx.prod.conf), pero en dev no hay nginx, asi que sin
+  // este proxy /mapa/ cae en el fallback SPA de este frontend y termina en
+  // el comodin "*" -> /login de AppRouter.tsx.
+  // NOTA PRODUCCION: este bloque (server.proxy / preview.proxy) no se usa
+  // en "vite build" ni en el sitio ya desplegado -- ahi el que decide como
+  // se sirve /mapa/ es nginx.prod.conf, no este archivo. No hace falta
+  // tocar ni quitar nada de aqui al pasar a produccion; solo hay que
+  // reconstruir y redeployar el stack de docker para que el build nuevo
+  // (con el link "Mapa" del Navbar) llegue al contenedor de nginx.
+  const mapviewProxyTarget =
+    env.MAPVIEW_PROXY_TARGET ||
+    env.VITE_MAPVIEW_PROXY_TARGET ||
+    "http://localhost:5174";
 
   const rutasApiTarget = env.API_RUTA_URL || "http://localhost:8004";
 
@@ -61,6 +76,11 @@ export default defineConfig(({ command, mode }) => {
             });
           },
         },
+        "/mapa": {
+          target: mapviewProxyTarget,
+          changeOrigin: true,
+          ws: true,
+        },
       },
     },
     preview: {
@@ -88,6 +108,11 @@ export default defineConfig(({ command, mode }) => {
               proxyReq.setHeader("ngrok-skip-browser-warning", "1");
             });
           },
+        },
+        "/mapa": {
+          target: mapviewProxyTarget,
+          changeOrigin: true,
+          ws: true,
         },
       },
     },

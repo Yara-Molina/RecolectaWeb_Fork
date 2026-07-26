@@ -9,10 +9,12 @@ import { firstAccessibleAdminPath } from "../services/auth";
 // Páginas globales
 import Dashboard from "../Pages/Dashboard/Dashboard";
 import Historial from "../Pages/Historial/Historial";
-import Alertas from "../Pages/Alertas/Alertas";
 import Anomalias from "../Pages/Anomalias/Anomalias";
 import EstadoRuta from "../Pages/EstadoRuta/EstadoRuta";
-import ValidacionRecoleccion from "../Pages/ValidacionRecoleccion/ValidacionRecoleccion";
+
+// Páginas sin conectar todavía (ver src/Pages/_inactive/README.md)
+import Alertas from "../Pages/_inactive/Alertas/Alertas";
+import ValidacionRecoleccion from "../Pages/_inactive/ValidacionRecoleccion/ValidacionRecoleccion";
 
 // ==========================
 // ADMINISTRACIÓN (NUEVO)
@@ -21,9 +23,11 @@ import ValidacionRecoleccion from "../Pages/ValidacionRecoleccion/ValidacionReco
 import AdministracionLayout from "../Pages/Administracion/AdministracionLayout";
 import RellenosSanitariosPage from "../Pages/Administracion/RellenosSanitarios/RellenosSanitariosPage";
 import CamionesPage from "../Pages/Administracion/Camiones/CamionesPage";
-import DiasRecoleccionPage from "../Pages/Administracion/DiasRecoleccion/DiasRecoleccionPage";
 import EmpleadosPage from "../Pages/Administracion/Empleados/EmpleadosPage";
 import DispositivosPage from "../Pages/Administracion/Dispositivos/DispositivosPage";
+
+// Sin conectar todavía (ver src/Pages/_inactive/README.md)
+import DiasRecoleccionPage from "../Pages/_inactive/DiasRecoleccion/DiasRecoleccionPage";
 
 // Layout global (Navbar + contenido)
 function AppLayout() {

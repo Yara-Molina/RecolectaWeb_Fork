@@ -1,5 +1,5 @@
 // src/Pages/Administracion/Camiones/components/CamionesTable.tsx
-import { FaEdit, FaTrashAlt } from "react-icons/fa";
+import { FiEdit2, FiTrash2 } from "react-icons/fi";
 import { ESTADOS_DISPONIBILIDAD } from "../CamionesPage";
 import type { Camion, TipoCamion } from "../CamionesPage";
 
@@ -16,9 +16,11 @@ interface Props {
   tiposCamion: TipoCamion[];
   onEditar: (camion: Camion) => void;
   onEliminar: (camion_id: number) => void;
+  // Conductor: solo puede consultar el listado de camiones.
+  readOnly?: boolean;
 }
 
-export default function CamionesTable({ camiones, tiposCamion, onEditar, onEliminar }: Props) {
+export default function CamionesTable({ camiones, tiposCamion, onEditar, onEliminar, readOnly = false }: Props) {
   if (camiones.length === 0) {
     return (
       <div className="empty-state">
@@ -38,7 +40,7 @@ export default function CamionesTable({ camiones, tiposCamion, onEditar, onElimi
             <th>TIPO</th>
             <th>RENTADO</th>
             <th>DISPONIBILIDAD</th>
-            <th style={{ width: 260 }}>ACCIONES</th>
+            {!readOnly && <th style={{ width: 260 }}>ACCIONES</th>}
           </tr>
         </thead>
 
@@ -72,19 +74,21 @@ export default function CamionesTable({ camiones, tiposCamion, onEditar, onElimi
                 })()}
               </td>
 
-              <td>
-                <div className="actions">
-                  <button className="btn btn-edit" onClick={() => onEditar(c)}>
-                    <FaEdit />
-                    Editar
-                  </button>
+              {!readOnly && (
+                <td>
+                  <div className="actions">
+                    <button className="btn btn-edit" onClick={() => onEditar(c)}>
+                      <FiEdit2 />
+                      <span>Editar</span>
+                    </button>
 
-                  <button className="btn btn-delete" onClick={() => onEliminar(c.camion_id)}>
-                    <FaTrashAlt />
-                    Eliminar
-                  </button>
-                </div>
-              </td>
+                    <button className="btn btn-delete" onClick={() => onEliminar(c.camion_id)}>
+                      <FiTrash2 />
+                      <span>Eliminar</span>
+                    </button>
+                  </div>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

@@ -1,4 +1,4 @@
-﻿/* HISTORIAL - CSS MODULAR ENCAPSULADO */
+/* HISTORIAL - CSS MODULAR ENCAPSULADO */
 /* Este archivo solo afecta al componente Historial */
 
 .historial-container {
@@ -29,12 +29,7 @@
   box-sizing: border-box;
 }
 
-.historial {
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-/* SECCIÓN 1: HEADER CON ESTADÍSTICAS */
+/* SECCION 1: HEADER CON ESTADISTICAS */
 .historial .historial-header {
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   border-radius: var(--radius);
@@ -114,7 +109,7 @@
   color: var(--text-light);
 }
 
-/* SECCIÓN 2: FILTROS */
+/* SECCION 2: FILTROS */
 .historial .filtros-container,
 .historial .table-container {
   background: var(--bg-card);
@@ -132,6 +127,8 @@
   margin-bottom: 16px;
   padding-bottom: 12px;
   border-bottom: 1px solid rgba(28, 50, 42, 0.08);
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .historial .filtros-title {
@@ -139,6 +136,38 @@
   font-weight: 600;
   margin: 0;
   color: var(--text);
+}
+
+.historial .filtros-header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.historial .btn-nueva {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 18px;
+  background: var(--primary);
+  color: #fff;
+  border: 1px solid var(--primary);
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.historial .btn-nueva:hover {
+  background: var(--primary-dark);
+}
+
+.historial .btn-nueva:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .historial .btn-limpiar {
@@ -262,7 +291,7 @@
   font-size: 16px;
 }
 
-/* SECCIÓN 3: TABLA DE DATOS */
+/* SECCION 3: TABLA DE DATOS */
 .historial .table-header {
   display: flex;
   justify-content: space-between;
@@ -348,7 +377,7 @@
   color: var(--text);
 }
 
-/* CELDAS ESPECÍFICAS */
+/* CELDAS ESPECIFICAS */
 .historial .punto-info,
 .historial .fecha-info,
 .historial .conductor-info,
@@ -430,45 +459,113 @@
   border-color: rgba(189, 195, 199, 0.3);
 }
 
-/* BOTONES DE ACCIÓN */
-.historial .btn-detalles {
+/* BOTONES DE ACCION */
+.historial .acciones-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.historial .btn-detalles,
+.historial .btn-baja,
+.historial .btn-eliminar {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
-  background: var(--bg-card);
+  padding: 8px 14px;
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 13px;
   color: var(--text);
   cursor: pointer;
   transition: var(--transition);
+  background: var(--bg-card);
 }
 
 .historial .btn-detalles:hover {
   background: var(--bg-light);
 }
 
-/* PAGINACIÓN */
-.historial .pagination {
+.historial .btn-baja {
+  color: var(--warning);
+  border-color: rgba(232, 141, 29, 0.24);
+  background: rgba(232, 141, 29, 0.08);
+}
+
+.historial .btn-baja:hover {
+  background: rgba(232, 141, 29, 0.16);
+}
+
+.historial .btn-eliminar {
+  color: var(--danger);
+  border-color: rgba(226, 75, 74, 0.24);
+  background: rgba(226, 75, 74, 0.08);
+}
+
+.historial .btn-eliminar:hover {
+  background: rgba(226, 75, 74, 0.16);
+}
+
+/* MENSAJE DE ERROR */
+.historial .form-error {
+  background: rgba(226, 75, 74, 0.1);
+  color: var(--danger);
+  border: 1px solid rgba(226, 75, 74, 0.2);
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 24px;
+  font-size: 14px;
+}
+
+/* AVISO DE CATALOGO (camiones/conductores que no cargaron, ej. por rol) */
+.historial .form-warning {
+  background: rgba(232, 141, 29, 0.1);
+  color: var(--warning);
+  border: 1px solid rgba(232, 141, 29, 0.24);
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 24px;
+  font-size: 14px;
+}
+
+/* ESTADO VACIO */
+.historial .empty-state {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-light);
+}
+
+.historial .table-pagination {
   display: flex;
-  justify-content: center;
   align-items: center;
-  gap: 16px;
-  margin-top: 24px;
+  justify-content: center;
+  gap: 20px;
   padding-top: 20px;
-  border-top: 1px solid rgba(28, 50, 42, 0.08);
+}
+
+.historial .pagination-info {
+  font-size: 14px;
+  color: var(--text-light);
 }
 
 .historial .pagination-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 16px;
-  background: var(--bg-card);
+  background: var(--bg-light);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 14px;
   color: var(--text);
   cursor: pointer;
   transition: var(--transition);
+}
+
+.historial .pagination-btn:hover:not(:disabled) {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 .historial .pagination-btn:disabled {
@@ -476,45 +573,148 @@
   cursor: not-allowed;
 }
 
-.historial .pagination-btn:not(:disabled):hover {
-  background: var(--bg-light);
+.historial .empty-state h3 {
+  margin: 0 0 8px 0;
+  color: var(--text);
 }
 
-.historial .pagination-pages {
+/* MODAL DE CREAR/EDITAR ASIGNACION */
+.historial .modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 19, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 999;
+  padding: 20px;
+}
+
+.historial .modal {
+  width: min(560px, 96vw);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+}
+
+.historial .modal-header {
   display: flex;
-  gap: 4px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
 }
 
-.historial .page-btn {
+.historial .modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.historial .modal-close {
   width: 36px;
   height: 36px;
-  border-radius: 50%;
+  border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text);
   cursor: pointer;
   transition: var(--transition);
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
-.historial .page-btn:hover {
-  background: var(--bg-light);
-  border-color: rgba(15, 103, 108, 0.3);
+.historial .modal-close:hover {
+  background: var(--primary-light);
+  color: var(--primary);
 }
 
-.historial .page-btn.active {
-  background: var(--primary);
+/* FORMULARIO DE ASIGNACION */
+.historial .form {
+  padding-top: 18px;
+}
+
+.historial .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.historial .field label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.historial .field input,
+.historial .field select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text);
+  transition: var(--transition);
+  font-size: 13px;
+}
+
+.historial .field input:focus,
+.historial .field select:focus {
+  outline: none;
   border-color: var(--primary);
-  color: white;
+  box-shadow: 0 0 0 3px rgba(15, 103, 108, 0.12);
 }
 
-.historial .page-dots {
+.historial .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.historial .btn-cancelar,
+.historial .btn-guardar {
   display: flex;
   align-items: center;
-  padding: 0 4px;
-  color: var(--text-light);
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  border: 1px solid var(--border);
+}
+
+.historial .btn-cancelar {
+  background: var(--bg-card);
+  color: var(--text);
+}
+
+.historial .btn-cancelar:hover {
+  background: var(--bg-light);
+}
+
+.historial .btn-guardar {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.historial .btn-guardar:hover {
+  background: var(--primary-dark);
+}
+
+.historial .btn-cancelar:disabled,
+.historial .btn-guardar:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* RESPONSIVE */
@@ -592,5 +792,23 @@
     justify-content: center;
     min-width: 100px;
     padding: 6px 8px;
+  }
+
+  .historial .filtros-header-actions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .historial .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .historial .form-actions {
+    flex-direction: column;
+  }
+
+  .historial .acciones-group {
+    flex-direction: column;
   }
 }

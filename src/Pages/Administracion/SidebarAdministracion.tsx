@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { FaTrashAlt, FaTruck, FaUsers } from "react-icons/fa";
+import { FaMobileAlt, FaTrashAlt, FaTruck, FaUsers } from "react-icons/fa";
 import "./SidebarAdministracion.css";
 import { canAccess } from "../../services/auth";
 
@@ -43,6 +43,18 @@ export default function SidebarAdministracion() {
             title="Empleados"
           >
             <FaUsers />
+          </NavLink>
+        )}
+
+        {canAccess("administracionDispositivos") && (
+          <NavLink
+            to="/administracion/dispositivos"
+            className={({ isActive }) =>
+              isActive ? "admin-link active" : "admin-link"
+            }
+            title="Dispositivos"
+          >
+            <FaMobileAlt />
           </NavLink>
         )}
       </nav>
