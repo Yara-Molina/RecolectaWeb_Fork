@@ -174,9 +174,7 @@ export default function Dashboard() {
   const [modoRuta, setModoRuta] = useState(false);
   const [puntosRuta, setPuntosRuta] = useState<PuntoRuta[]>([]);
   const [nombreRutaNueva, setNombreRutaNueva] = useState('');
-
   const [conductorSeleccionado, setConductorSeleccionado] = useState<number | null>(null);
-
   const [guardandoRuta, setGuardandoRuta] = useState(false);
   const [errorRuta, setErrorRuta] = useState<string | null>(null);
 
@@ -388,7 +386,6 @@ export default function Dashboard() {
     if (!conductorSeleccionado) {
 
       setErrorRuta('Selecciona un conductor antes de guardar la ruta.');
-
       return;
     }
 
@@ -410,7 +407,6 @@ export default function Dashboard() {
         lng: ultimoPunto.lng,
         nombre: 'Base Fin'
       };
-
 
       const conductorNombre = conductores.find(c => c.id === conductorSeleccionado)?.nombre || 'Francisco Castro';
 
@@ -583,6 +579,16 @@ return (
                     value={nombreRutaNueva}
                     onChange={(e) => setNombreRutaNueva(e.target.value)}
                   />
+                  <select
+                    className="camion-selector"
+                    value={conductorSeleccionado ?? ''}
+                    onChange={(e) => setConductorSeleccionado(e.target.value ? Number(e.target.value) : null)}
+                  >
+                    <option value="">Selecciona conductor</option>
+                    {conductores.map(c => (
+                      <option key={c.id} value={c.id}>{c.nombre}</option>
+                    ))}
+                  </select>
                   <span className="pager-info">{puntosRuta.length} puntos</span>
                   <button className="pager-btn" onClick={() => setPuntosRuta(prev => prev.slice(0, -1))} disabled={puntosRuta.length <= 1}>Deshacer</button>
                   <button className="pager-btn" onClick={guardarRuta} disabled={guardandoRuta}>
@@ -709,3 +715,4 @@ return (
 );
 
 }
+

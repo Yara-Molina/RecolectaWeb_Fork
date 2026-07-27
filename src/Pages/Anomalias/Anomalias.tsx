@@ -26,6 +26,10 @@ const ITEMS_POR_PAGINA = 10;
 type EstadoAnomalia = 'PENDIENTE' | 'EN_PROCESO' | 'RESUELTA';
 
 // Tal como responde GET/POST/PUT /api/anomalias/
+// (src/Fallas/domain/entities/anomalia.go). OJO: el campo es "conductor_id",
+// no "id_chofer_id" -- con el nombre viejo el PUT nunca mandaba este dato,
+// y como el UPDATE del backend reemplaza la columna completa, cada guardado
+// desde esta pantalla borraba el conductor_id real de la anomalía.
 interface Anomalia {
   anomalia_id: number;
   punto_id: number | null;
@@ -34,7 +38,15 @@ interface Anomalia {
   fecha_reporte: string;
   estado: EstadoAnomalia;
   fecha_resolucion: string | null;
-  id_chofer_id: number;
+  conductor_id: number | null;
+  // Resultado del pipeline modelo_reportes -> clasificador_reportes,
+  // se llena solo (async) al crear la anomalía.
+  estado_pipeline?: string;
+  nivel_riesgo?: string | null;
+  categoria_clasificada?: string | null;
+  subtipo_clasificado?: string | null;
+  accion_sugerida?: string | null;
+  pipeline_error?: string | null;
 }
 
 interface AnomaliaPayload {
@@ -44,7 +56,7 @@ interface AnomaliaPayload {
   fecha_reporte: string;
   estado: EstadoAnomalia;
   fecha_resolucion: string | null;
-  id_chofer_id: number;
+  conductor_id: number | null;
 }
 
 function mensajeError(err: unknown, fallback: string): string {
@@ -163,7 +175,7 @@ export default function Anomalias() {
       fecha_reporte: selectedAnomalia.fecha_reporte,
       estado: modalEstado,
       fecha_resolucion: modalEstado === 'RESUELTA' ? new Date().toISOString() : null,
-      id_chofer_id: selectedAnomalia.id_chofer_id,
+      conductor_id: selectedAnomalia.conductor_id,
     };
 
     try {
@@ -412,6 +424,55 @@ export default function Anomalias() {
                     {selectedAnomalia.descripcion}
                   </div>
                 </div>
+
+                {selectedAnomalia.estado_pipeline && (
+                  <div className="anomalias modal-section">
+                    <label className="anomalias modal-label">Clasificación automática</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 13 }}>
+                      <span style={{ padding: '4px 10px', borderRadius: 12, background: '#f1f2f6' }}>
+                        Pipeline: {selectedAnomalia.estado_pipeline}
+                      </span>
+                      {selectedAnomalia.nivel_riesgo && (
+                        <span
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: 12,
+                            background:
+                              selectedAnomalia.nivel_riesgo === 'alto'
+                                ? '#fdecea'
+                                : selectedAnomalia.nivel_riesgo === 'medio'
+                                ? '#fff4e0'
+                                : '#eafaf1',
+                            color:
+                              selectedAnomalia.nivel_riesgo === 'alto'
+                                ? '#e74c3c'
+                                : selectedAnomalia.nivel_riesgo === 'medio'
+                                ? '#c78a1e'
+                                : '#27ae60',
+                          }}
+                        >
+                          Riesgo: {selectedAnomalia.nivel_riesgo}
+                        </span>
+                      )}
+                      {selectedAnomalia.categoria_clasificada && (
+                        <span style={{ padding: '4px 10px', borderRadius: 12, background: '#f1f2f6' }}>
+                          Categoría: {selectedAnomalia.categoria_clasificada}
+                          {selectedAnomalia.subtipo_clasificado ? ` / ${selectedAnomalia.subtipo_clasificado}` : ''}
+                        </span>
+                      )}
+                      {selectedAnomalia.accion_sugerida && (
+                        <span style={{ padding: '4px 10px', borderRadius: 12, background: '#f1f2f6' }}>
+                          Acción sugerida: {selectedAnomalia.accion_sugerida}
+                        </span>
+                      )}
+                      {selectedAnomalia.pipeline_error && (
+                        <span style={{ padding: '4px 10px', borderRadius: 12, background: '#fdecea', color: '#e74c3c' }}>
+                          Error: {selectedAnomalia.pipeline_error}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="anomalias modal-section">
                   <label className="anomalias modal-label">Actualizar estado</label>
