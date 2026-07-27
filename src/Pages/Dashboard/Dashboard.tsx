@@ -1,4 +1,3 @@
-// Dashboard.tsx - Componente principal del dashboard de monitoreo de flota
 import { useState, useEffect } from 'react';
 import { FiAlertTriangle } from 'react-icons/fi';
 import MapaSuchiapa, { type CamionMapa } from './mapa/MapaSuchiapa';
