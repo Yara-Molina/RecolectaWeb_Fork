@@ -2,21 +2,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './EstadoRuta.css';
-import { apiRequest, ApiError } from '../../services/api';
+import { apiRequest, ApiError, getRole } from '../../services/api';
+import { ROLES } from '../../services/auth';
 import {
   FiMapPin,
-  FiCheckCircle,
-  FiPauseCircle,
   FiSearch,
   FiDownload,
   FiTruck,
-  FiPlus,
   FiEdit2,
   FiTrash2,
   FiSave,
   FiX,
-  FiList,
+  FiChevronLeft,
+  FiChevronRight,
 } from 'react-icons/fi';
+
+const PUNTOS_POR_PAGINA = 10;
 
 // Tal como responde GET /api/rutas/ (envuelto en { success, data })
 interface Ruta {
@@ -27,19 +28,24 @@ interface Ruta {
   created_at: string;
 }
 
-// Tal como responde GET/POST/PUT /api/puntos-recoleccion/
+// Tal como responde GET /api/puntos-recoleccion/
 interface PuntoRecoleccion {
   punto_id: number;
   ruta_id: number;
   cp: string;
+  lat: number;
+  lon: number;
   eliminado: boolean;
   created_at: string;
 }
 
+// Tal como lo pide POST /api/puntos-recoleccion/ y PUT /api/puntos-recoleccion/{id}
 interface PuntoPayload {
-  ruta_id: number;
   cp: string;
-  eliminado: boolean;
+  lat: number;
+  lon: number;
+  punto_id: number;
+  ruta_id: number;
 }
 
 function mensajeError(err: unknown, fallback: string): string {
@@ -62,13 +68,17 @@ export default function EstadoRuta() {
 
   const [selectedRutaId, setSelectedRutaId] = useState<number | 'todas'>('todas');
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'ver' | 'crear'>('ver');
+  const [pagina, setPagina] = useState(1);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formCp, setFormCp] = useState('');
   const [formRutaId, setFormRutaId] = useState<number | null>(null);
-  const [formEliminado, setFormEliminado] = useState(false);
+  const [formLat, setFormLat] = useState('');
+  const [formLon, setFormLon] = useState('');
+
+  // Conductor: solo puede consultar los puntos de recoleccion, no editarlos ni eliminarlos.
+  const isConductor = getRole() === ROLES.CONDUCTOR;
 
   async function loadAll() {
     setLoading(true);
@@ -101,12 +111,7 @@ export default function EstadoRuta() {
 
   const nombreRuta = (rutaId: number) => rutas.find((r) => r.ruta_id === rutaId)?.nombre ?? `Ruta ${rutaId}`;
 
-  const estadisticas = useMemo(() => {
-    const total = puntos.length;
-    const activos = puntos.filter((p) => !p.eliminado).length;
-    const inactivos = puntos.filter((p) => p.eliminado).length;
-    return { total, activos, inactivos };
-  }, [puntos]);
+  const estadisticas = useMemo(() => ({ total: puntos.length }), [puntos]);
 
   const puntosFiltrados = puntos.filter((punto) => {
     if (selectedRutaId !== 'todas' && punto.ruta_id !== selectedRutaId) return false;
@@ -114,21 +119,33 @@ export default function EstadoRuta() {
     return true;
   });
 
+  const totalPaginas = Math.max(1, Math.ceil(puntosFiltrados.length / PUNTOS_POR_PAGINA));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const puntosPagina = puntosFiltrados.slice(
+    (paginaActual - 1) * PUNTOS_POR_PAGINA,
+    paginaActual * PUNTOS_POR_PAGINA,
+  );
+
+  useEffect(() => {
+    setPagina(1);
+  }, [selectedRutaId, searchTerm]);
+
   const handleResetForm = () => {
     setIsEditing(false);
     setEditingId(null);
     setFormCp('');
-    setFormEliminado(false);
+    setFormLat('');
+    setFormLon('');
     setFormRutaId(rutas[0]?.ruta_id ?? null);
   };
 
   const handleEditPunto = (punto: PuntoRecoleccion) => {
-    setActiveTab('crear');
     setIsEditing(true);
     setEditingId(punto.punto_id);
     setFormCp(punto.cp);
     setFormRutaId(punto.ruta_id);
-    setFormEliminado(punto.eliminado);
+    setFormLat(String(punto.lat));
+    setFormLon(String(punto.lon));
   };
 
   const handleDeletePunto = async (id: number) => {
@@ -151,15 +168,20 @@ export default function EstadoRuta() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formCp.trim() || !formRutaId) {
-      alert('Por favor completa el código postal y selecciona una ruta.');
+    const lat = Number(formLat);
+    const lon = Number(formLon);
+
+    if (!formCp.trim() || !formRutaId || formLat.trim() === '' || formLon.trim() === '' || Number.isNaN(lat) || Number.isNaN(lon)) {
+      alert('Por favor completa el código postal, la ruta y las coordenadas (lat/lon).');
       return;
     }
 
     const payload: PuntoPayload = {
-      ruta_id: formRutaId,
       cp: formCp.trim(),
-      eliminado: formEliminado,
+      lat,
+      lon,
+      punto_id: editingId ?? 0,
+      ruta_id: formRutaId,
     };
 
     setSaving(true);
@@ -179,7 +201,6 @@ export default function EstadoRuta() {
       }
 
       handleResetForm();
-      setActiveTab('ver');
       await loadAll();
     } catch (err) {
       setError(mensajeError(err, 'No se pudo guardar el punto de recolección.'));
@@ -190,8 +211,8 @@ export default function EstadoRuta() {
   };
 
   const handleExport = () => {
-    const headers = ['ID', 'Ruta', 'CP', 'Estado'];
-    const rows = puntosFiltrados.map((p) => [p.punto_id, nombreRuta(p.ruta_id), p.cp, p.eliminado ? 'Inactivo' : 'Activo']);
+    const headers = ['Ruta', 'CP', 'Lat', 'Lon'];
+    const rows = puntosFiltrados.map((p) => [nombreRuta(p.ruta_id), p.cp, p.lat, p.lon]);
 
     const csv = [headers, ...rows]
       .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(','))
@@ -226,54 +247,13 @@ export default function EstadoRuta() {
                   <span className="estado-ruta stat-label">Puntos totales</span>
                 </div>
               </div>
-
-              <div className="estado-ruta stat-card">
-                <div className="estado-ruta stat-icon" style={{ backgroundColor: 'rgba(15, 236, 107, 0.94)' }}>
-                  <FiCheckCircle />
-                </div>
-                <div>
-                  <span className="estado-ruta stat-value">{estadisticas.activos}</span>
-                  <span className="estado-ruta stat-label">Activos</span>
-                </div>
-              </div>
-
-              <div className="estado-ruta stat-card">
-                <div className="estado-ruta stat-icon" style={{ backgroundColor: 'rgba(192, 241, 15, 0.9)' }}>
-                  <FiPauseCircle />
-                </div>
-                <div>
-                  <span className="estado-ruta stat-value">{estadisticas.inactivos}</span>
-                  <span className="estado-ruta stat-label">Inactivos</span>
-                </div>
-              </div>
             </div>
           </div>
         </header>
 
-        <div className="estado-ruta tabs-navigation">
-          <div className="estado-ruta tabs-container">
-            <button
-              className={`estado-ruta tab-btn ${activeTab === 'ver' ? 'active' : ''}`}
-              onClick={() => setActiveTab('ver')}
-            >
-              <FiList />
-              <span>Ver Puntos</span>
-            </button>
-            <button
-              className={`estado-ruta tab-btn ${activeTab === 'crear' ? 'active' : ''}`}
-              onClick={() => setActiveTab('crear')}
-            >
-              <FiPlus />
-              <span>{isEditing ? 'Editar Punto' : 'Crear Punto'}</span>
-            </button>
-          </div>
-        </div>
-
         {error && <div style={{ color: '#e74c3c', padding: '8px 16px' }}>{error}</div>}
 
-        {activeTab === 'ver' && (
-          <>
-            <div className="estado-ruta controles-panel">
+        <div className="estado-ruta controles-panel">
               <div className="estado-ruta controles-left">
                 <div className="estado-ruta ruta-selector">
                   <label className="estado-ruta selector-label">
@@ -326,49 +306,49 @@ export default function EstadoRuta() {
                   <table className="estado-ruta estado-ruta-table">
                     <thead>
                       <tr>
-                        <th>ID</th>
                         <th>Ruta</th>
                         <th>Código Postal</th>
-                        <th>Estado</th>
-                        <th>Acciones</th>
+                        <th>Coordenadas</th>
+                        {!isConductor && <th>Acciones</th>}
                       </tr>
                     </thead>
                     <tbody>
                       {puntosFiltrados.length === 0 ? (
                         <tr>
-                          <td colSpan={5} style={{ textAlign: 'center', padding: 24 }}>
+                          <td colSpan={isConductor ? 3 : 4} style={{ textAlign: 'center', padding: 24 }}>
                             No hay puntos de recolección para mostrar.
                           </td>
                         </tr>
                       ) : (
-                        puntosFiltrados.map((punto) => (
+                        puntosPagina.map((punto) => (
                           <tr key={punto.punto_id} className="estado-ruta table-row">
-                            <td>#{punto.punto_id}</td>
                             <td className="estado-ruta direccion-cell">
                               <FiMapPin />
                               <span>{nombreRuta(punto.ruta_id)}</span>
                             </td>
                             <td>{punto.cp}</td>
-                            <td className="estado-ruta estado-cell">
-                              <div className={`estado-ruta estado-badge estado-${punto.eliminado ? 'inactivo' : 'activo'}`}>
-                                {punto.eliminado ? <FiPauseCircle /> : <FiCheckCircle />}
-                                <span>{punto.eliminado ? 'Inactivo' : 'Activo'}</span>
+                            <td className="estado-ruta coordenadas-cell">
+                              <div className="estado-ruta coordenadas-info">
+                                <span className="estado-ruta coordenadas">Lat: {punto.lat}</span>
+                                <span className="estado-ruta coordenadas">Lon: {punto.lon}</span>
                               </div>
                             </td>
-                            <td className="estado-ruta acciones-cell">
-                              <button className="estado-ruta btn-editar" onClick={() => handleEditPunto(punto)}>
-                                <FiEdit2 />
-                                <span>Editar</span>
-                              </button>
-                              <button
-                                className="estado-ruta btn-eliminar"
-                                onClick={() => void handleDeletePunto(punto.punto_id)}
-                                disabled={saving}
-                              >
-                                <FiTrash2 />
-                                <span>Eliminar</span>
-                              </button>
-                            </td>
+                            {!isConductor && (
+                              <td className="estado-ruta acciones-cell">
+                                <button className="estado-ruta btn-editar" onClick={() => handleEditPunto(punto)}>
+                                  <FiEdit2 />
+                                  <span>Editar</span>
+                                </button>
+                                <button
+                                  className="estado-ruta btn-eliminar"
+                                  onClick={() => void handleDeletePunto(punto.punto_id)}
+                                  disabled={saving}
+                                >
+                                  <FiTrash2 />
+                                  <span>Eliminar</span>
+                                </button>
+                              </td>
+                            )}
                           </tr>
                         ))
                       )}
@@ -376,16 +356,46 @@ export default function EstadoRuta() {
                   </table>
                 )}
               </div>
-            </div>
-          </>
-        )}
 
-        {activeTab === 'crear' && (
-          <div className="estado-ruta crear-punto-container">
+              {!loading && totalPaginas > 1 && (
+                <div className="estado-ruta table-pagination">
+                  <button
+                    type="button"
+                    className="estado-ruta pagination-btn"
+                    onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                    disabled={paginaActual === 1}
+                  >
+                    <FiChevronLeft />
+                    <span>Anterior</span>
+                  </button>
+
+                  <span className="estado-ruta pagination-info">
+                    Página {paginaActual} de {totalPaginas}
+                  </span>
+
+                  <button
+                    type="button"
+                    className="estado-ruta pagination-btn"
+                    onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                    disabled={paginaActual === totalPaginas}
+                  >
+                    <span>Siguiente</span>
+                    <FiChevronRight />
+                  </button>
+                </div>
+              )}
+            </div>
+
+        {isEditing && (
+          <div className="estado-ruta modal-overlay" onClick={handleResetForm}>
+            <div className="estado-ruta modal-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="estado-ruta crear-punto-form">
-              <h2 className="estado-ruta form-title">
-                {isEditing ? 'Editar Punto de Recolección' : 'Crear Nuevo Punto de Recolección'}
-              </h2>
+              <div className="estado-ruta modal-header">
+                <h2 className="estado-ruta form-title">Editar Punto de Recolección</h2>
+                <button type="button" className="estado-ruta modal-close" onClick={handleResetForm}>
+                  <FiX />
+                </button>
+              </div>
 
               <form onSubmit={handleSubmit}>
                 <div className="estado-ruta form-grid">
@@ -422,37 +432,43 @@ export default function EstadoRuta() {
                   </div>
 
                   <div className="estado-ruta form-group">
-                    <label className="estado-ruta form-label">Estado</label>
-                    <select
-                      className="estado-ruta form-select"
-                      value={formEliminado ? 'inactivo' : 'activo'}
-                      onChange={(e) => setFormEliminado(e.target.value === 'inactivo')}
-                    >
-                      <option value="activo">Activo</option>
-                      <option value="inactivo">Inactivo</option>
-                    </select>
+                    <label className="estado-ruta form-label">Latitud *</label>
+                    <input
+                      type="number"
+                      step="any"
+                      className="estado-ruta form-input"
+                      value={formLat}
+                      onChange={(e) => setFormLat(e.target.value)}
+                      placeholder="Ej: 16.7569"
+                    />
+                  </div>
+
+                  <div className="estado-ruta form-group">
+                    <label className="estado-ruta form-label">Longitud *</label>
+                    <input
+                      type="number"
+                      step="any"
+                      className="estado-ruta form-input"
+                      value={formLon}
+                      onChange={(e) => setFormLon(e.target.value)}
+                      placeholder="Ej: -93.1292"
+                    />
                   </div>
                 </div>
 
                 <div className="estado-ruta form-actions">
-                  <button
-                    type="button"
-                    className="estado-ruta btn-cancelar"
-                    onClick={() => {
-                      handleResetForm();
-                      setActiveTab('ver');
-                    }}
-                  >
+                  <button type="button" className="estado-ruta btn-cancelar" onClick={handleResetForm}>
                     <FiX />
                     <span>Cancelar</span>
                   </button>
 
                   <button type="submit" className="estado-ruta btn-guardar" disabled={saving}>
                     <FiSave />
-                    <span>{saving ? 'Guardando...' : isEditing ? 'Actualizar Punto' : 'Crear Punto'}</span>
+                    <span>{saving ? 'Guardando...' : 'Actualizar Punto'}</span>
                   </button>
                 </div>
               </form>
+            </div>
             </div>
           </div>
         )}

@@ -1,9 +1,10 @@
 // Login.jsx o Login.tsx
 import { useState } from 'react';
-import './Login.css'; 
+import './Login.css';
 import Logo from '../../Assets/Logo.png';
 import { useNavigate } from 'react-router-dom';
-import { apiRequest, setToken, setRole } from '../../services/api';
+import { FiEye, FiEyeOff } from 'react-icons/fi';
+import { apiRequest, setToken, setRole, setUserName } from '../../services/api';
 
 interface LoginResponse {
   token?: string;
@@ -11,12 +12,15 @@ interface LoginResponse {
   jwt?: string;
   data?: {
     rol_id?: number;
+    nombre?: string;
+    apellidos?: string;
   };
 }
 
 export default function Login() {
   const [emailOrAlias, setEmailOrAlias] = useState('');
   const [contrasena, setContrasena] = useState('');
+  const [mostrarContrasena, setMostrarContrasena] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -39,6 +43,11 @@ export default function Login() {
 
       if (typeof data.data?.rol_id === 'number') {
         setRole(data.data.rol_id);
+      }
+
+      const fullName = [data.data?.nombre, data.data?.apellidos].filter(Boolean).join(' ').trim();
+      if (fullName) {
+        setUserName(fullName);
       }
 
       navigate('/dashboard');
@@ -77,14 +86,25 @@ export default function Login() {
             
             <div className="input-group">
               <label htmlFor="contrasena">Contraseña</label>
-              <input
-                type="password"
-                id="contrasena"
-                value={contrasena}
-                onChange={(e) => setContrasena(e.target.value)}
-                placeholder="Ingresa tu contraseña"
-                required
-              />
+              <div className="password-field">
+                <input
+                  type={mostrarContrasena ? 'text' : 'password'}
+                  id="contrasena"
+                  value={contrasena}
+                  onChange={(e) => setContrasena(e.target.value)}
+                  placeholder="Ingresa tu contraseña"
+                  required
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setMostrarContrasena((v) => !v)}
+                  tabIndex={-1}
+                  aria-label={mostrarContrasena ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                >
+                  {mostrarContrasena ? <FiEyeOff /> : <FiEye />}
+                </button>
+              </div>
             </div>
 
             <button type="submit" className="login-button" disabled={loading}>

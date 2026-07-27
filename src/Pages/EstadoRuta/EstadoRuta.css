@@ -397,6 +397,44 @@
   color: var(--text);
 }
 
+.estado-ruta .table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding-top: 20px;
+}
+
+.estado-ruta .pagination-info {
+  font-size: 14px;
+  color: var(--text-light);
+}
+
+.estado-ruta .pagination-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--bg-light);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.estado-ruta .pagination-btn:hover:not(:disabled) {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.estado-ruta .pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* CELDAS ESPECÍFICAS ACTUALIZADAS */
 .estado-ruta .coordenadas-cell,
 .estado-ruta .direccion-cell,
@@ -517,10 +555,10 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
+  padding: 8px 14px;
   background: var(--warning-light);
   border: 1px solid rgba(232, 141, 29, 0.3);
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 13px;
   color: var(--warning);
   cursor: pointer;
@@ -537,10 +575,10 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
+  padding: 8px 14px;
   background: var(--danger-light);
   border: 1px solid rgba(226, 75, 74, 0.3);
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 13px;
   color: var(--danger);
   cursor: pointer;
@@ -557,6 +595,62 @@
 .estado-ruta .btn-eliminar svg,
 .estado-ruta .btn-detalles svg {
   font-size: 14px;
+}
+
+/* MODAL DE EDICIÓN DE PUNTO */
+.estado-ruta .modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 20, 17, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.estado-ruta .modal-dialog {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 32px;
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border);
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.estado-ruta .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.estado-ruta .modal-header .form-title {
+  margin: 0;
+}
+
+.estado-ruta .modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: var(--bg-light);
+  color: var(--text-light);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.estado-ruta .modal-close:hover {
+  background: var(--danger-light);
+  color: var(--danger);
 }
 
 /* PANEL DE CREAR/EDITAR PUNTO */
@@ -694,10 +788,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 24px;
+  padding: 11px 18px;
   border-radius: 10px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: var(--transition);
   border: 1px solid transparent;
@@ -716,14 +810,13 @@
 }
 
 .estado-ruta .btn-guardar {
-  background: var(--success-light);
-  color: var(--success);
-  border-color: rgba(99, 153, 34, 0.3);
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
 }
 
 .estado-ruta .btn-guardar:hover {
-  background: rgba(99, 153, 34, 0.15);
-  border-color: var(--success);
+  background: var(--primary-dark);
   transform: translateY(-2px);
 }
 

@@ -20,7 +20,6 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-  padding: 24px;
   background: var(--bg-light);
   color: var(--text);
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -60,10 +59,10 @@
 }
 
 .dias .dr-header h1 {
-  margin: 0;
-  font-size: 22px;
+  font-size: 28px;
   font-weight: 600;
-  line-height: 1.2;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.5px;
 }
 
 .dias .dr-header p {
@@ -485,10 +484,6 @@
 }
 
 @media (max-width: 1200px) {
-  .dr-page {
-    padding: 20px;
-  }
-
   .dias .dr-header,
   .dias .dr-filters {
     flex-direction: column;
@@ -505,10 +500,6 @@
 }
 
 @media (max-width: 768px) {
-  .dr-page {
-    padding: 12px;
-  }
-
   .dias .dr-actions {
     flex-direction: column;
   }

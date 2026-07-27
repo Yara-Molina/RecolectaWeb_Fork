@@ -8,18 +8,18 @@ import { getRole } from "./api";
 
 export const ROLES = {
   ADMIN: 1,
-  CONDUCTOR: 2,
+  COORDINADOR: 2,
   SUPERVISOR: 3,
-  COORDINADOR: 4,
+  CONDUCTOR: 4,
 } as const;
 
 export type RoleId = (typeof ROLES)[keyof typeof ROLES];
 
 export const ROLE_NAMES: Record<RoleId, string> = {
   1: "Administrador",
-  2: "Conductor",
-  3: "Supervisor",
-  4: "Coordinador",
+  2: "Coordinador",
+  3: "Operador",
+  4: "Conductor",
 };
 
 export type SectionKey =
@@ -33,7 +33,8 @@ export type SectionKey =
   | "administracionRellenos"
   | "administracionCamiones"
   | "administracionDiasRecoleccion"
-  | "administracionEmpleados";
+  | "administracionEmpleados"
+  | "administracionDispositivos";
 
 // Secciones "de solo lectura"/informativas (Dashboard, Historial) que no
 // tienen un endpoint protegido propio: se dejan visibles para cualquier
@@ -74,6 +75,9 @@ export const SECTION_ROLES: Record<SectionKey, RoleId[]> = {
 
   // /api/empleados -> RequireRole(ADMIN) exclusivamente
   administracionEmpleados: [ROLES.ADMIN],
+
+  // /api/dispositivos/{pendientes,aprobar,desvincular} -> RequireRole(SUPERVISOR, ADMIN, COORDINADOR)
+  administracionDispositivos: [ROLES.ADMIN, ROLES.SUPERVISOR, ROLES.COORDINADOR],
 };
 
 // Orden en el que se intenta redirigir a la primera sub-sección accesible
@@ -85,6 +89,7 @@ export const ADMINISTRACION_SUBSECCIONES: { key: SectionKey; path: string }[] = 
   { key: "administracionRellenos", path: "rellenos" },
   { key: "administracionCamiones", path: "camiones" },
   { key: "administracionEmpleados", path: "empleados" },
+  { key: "administracionDispositivos", path: "dispositivos" },
 ];
 
 export function canAccess(section: SectionKey, roleId: number | null = getRole()): boolean {

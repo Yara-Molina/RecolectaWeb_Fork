@@ -1,11 +1,21 @@
+import { FiEdit2, FiTrash2 } from "react-icons/fi";
 import type { Empleado } from "../EmpleadosPage";
+import { ROLES, ROLE_NAMES, type RoleId } from "../../../../services/auth";
 
 interface Props {
   data: Empleado[];
   onDelete: (empleadoId: number) => void;
+  onEdit: (empleado: Empleado) => void;
 }
 
-export default function EmpleadosTable({ data, onDelete }: Props) {
+const ROLE_BADGE_CLASS: Record<RoleId, string> = {
+  [ROLES.ADMIN]: "role-admin",
+  [ROLES.CONDUCTOR]: "role-conductor",
+  [ROLES.SUPERVISOR]: "role-operador",
+  [ROLES.COORDINADOR]: "role-coordinador",
+};
+
+export default function EmpleadosTable({ data, onDelete, onEdit }: Props) {
   if (data.length === 0) {
     return <div className="emp-loading">No hay empleados para mostrar.</div>;
   }
@@ -17,6 +27,7 @@ export default function EmpleadosTable({ data, onDelete }: Props) {
           <tr>
             <th>NOMBRE</th>
             <th>EMAIL</th>
+            <th>ROL</th>
             <th>FECHA REGISTRO</th>
             <th>ACCIONES</th>
           </tr>
@@ -31,14 +42,24 @@ export default function EmpleadosTable({ data, onDelete }: Props) {
               </td>
               <td>{empleado.email}</td>
               <td>
+                <span className={`emp-badge ${ROLE_BADGE_CLASS[empleado.rolId as RoleId] ?? ""}`}>
+                  {ROLE_NAMES[empleado.rolId as RoleId] ?? "—"}
+                </span>
+              </td>
+              <td>
                 {empleado.created_at
                   ? new Date(empleado.created_at).toLocaleDateString("es-MX")
                   : "—"}
               </td>
               <td>
                 <div className="emp-actions-row">
+                  <button className="emp-action edit" onClick={() => onEdit(empleado)}>
+                    <FiEdit2 />
+                    <span>Editar</span>
+                  </button>
                   <button className="emp-action delete" onClick={() => onDelete(empleado.id)}>
-                    Eliminar
+                    <FiTrash2 />
+                    <span>Eliminar</span>
                   </button>
                 </div>
               </td>

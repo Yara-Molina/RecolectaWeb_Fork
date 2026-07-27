@@ -1,317 +1,467 @@
 // pages/Historial/Historial.tsx
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import './Historial.css';
-import { 
-  FiSearch, 
-  FiX, 
-  FiEye, 
-  FiCalendar,
+import {
+  FiSearch,
+  FiX,
   FiTruck,
   FiUser,
   FiCheckCircle,
   FiClock,
-  FiAlertCircle,
-  FiPauseCircle
+  FiPlus,
+  FiChevronLeft,
+  FiChevronRight,
 } from 'react-icons/fi';
 
+const ITEMS_POR_PAGINA = 10;
+import { apiRequest, getRole } from '../../services/api';
+import { ROLES } from '../../services/auth';
+import AsignacionForm from './components/AsignacionForm';
+import AsignacionTable from './components/AsignacionTable';
+
+// Catalogos minimos que necesita esta pantalla para mostrar placa/nombre en
+// lugar de solo ids. No son el modelo completo de Camion/Empleado (ver
+// CamionesPage.tsx / EmpleadosPage.tsx), solo lo que hace falta aqui.
+export interface Camion {
+  camion_id: number;
+  placa: string;
+}
+
+// "Conductor" es el nombre que usamos en esta pantalla para los empleados
+// con rol_id === ROLES.CONDUCTOR (core/roles.go). El backend los expone
+// dentro del mismo listado que /api/empleados/, no en un endpoint aparte.
+export interface Conductor {
+  id: number;
+  nombre: string;
+}
+
+// Coincide con lo que pide/devuelve el backend en /api/historial-asignacion/:
+// { fecha_asignacion, fecha_baja, id_camion, id_chofer, id_historial }
+// (el nombre de campo "id_chofer" es del backend; en el frontend lo tratamos
+// como "conductor" nada mas para la UI).
+export interface HistorialAsignacion {
+  id_historial: number;
+  id_camion: number;
+  id_chofer: number;
+  fecha_asignacion: string;
+  fecha_baja: string;
+}
+
+export interface AsignacionPayload {
+  id_camion: number;
+  id_chofer: number;
+  fecha_asignacion: string;
+  fecha_baja: string;
+}
+
+function normalizarAsignacion(raw: unknown): HistorialAsignacion {
+  const s = raw as Record<string, unknown>;
+  return {
+    id_historial: Number(s.id_historial ?? 0),
+    id_camion: Number(s.id_camion ?? 0),
+    id_chofer: Number(s.id_chofer ?? 0),
+    fecha_asignacion: typeof s.fecha_asignacion === 'string' ? s.fecha_asignacion : '',
+    fecha_baja: typeof s.fecha_baja === 'string' ? s.fecha_baja : '',
+  };
+}
+
+function normalizarConductor(raw: unknown): Conductor {
+  const s = raw as Record<string, unknown>;
+  const id = Number(s.id ?? 0);
+  return {
+    id,
+    nombre: typeof s.nombre === 'string' && s.nombre.length > 0 ? s.nombre : `Conductor #${id}`,
+  };
+}
+
 export default function Historial() {
-  const [selectedDate, setSelectedDate] = useState('');
-  const [selectedRuta, setSelectedRuta] = useState('');
+  const [asignaciones, setAsignaciones] = useState<HistorialAsignacion[]>([]);
+  const [camiones, setCamiones] = useState<Camion[]>([]);
+  const [conductores, setConductores] = useState<Conductor[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [catalogWarning, setCatalogWarning] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const [selectedCamion, setSelectedCamion] = useState('');
   const [selectedConductor, setSelectedConductor] = useState('');
-  const [activeFilter, setActiveFilter] = useState('todos');
+  const [activeFilter, setActiveFilter] = useState<'todos' | 'activa' | 'finalizada'>('todos');
   const [searchTerm, setSearchTerm] = useState('');
+  const [pagina, setPagina] = useState(1);
 
-  const historial = [
-    {
-      id: 1,
-      punto: 'Centro Comercial Plaza',
-      direccion: 'Av. Principal #123',
-      fecha: '2026-01-05',
-      hora: '08:30',
-      conductor: 'Juan Pérez',
-      vehiculo: 'Camión RE-01',
-      ruta: 'Ruta 01',
-      estado: 'completado',
-    },
-    {
-      id: 2,
-      punto: 'Zona Residencial Norte',
-      direccion: 'Calle Los Pinos #456',
-      fecha: '2026-01-05',
-      hora: '09:10',
-      conductor: 'Carlos Ruiz',
-      vehiculo: 'Camión RE-02',
-      ruta: 'Ruta 02',
-      estado: 'en-proceso',
-    },
-    {
-      id: 3,
-      punto: 'Mercado Municipal',
-      direccion: 'Av. Central #789',
-      fecha: '2026-01-05',
-      hora: '09:45',
-      conductor: 'Ana Torres',
-      vehiculo: 'Camión RE-03',
-      ruta: 'Ruta 03',
-      estado: 'retrasado',
-    },
-    {
-      id: 4,
-      punto: 'Parque Industrial',
-      direccion: 'Carretera Norte KM 5',
-      fecha: '2026-01-05',
-      hora: '10:20',
-      conductor: 'Luis Gómez',
-      vehiculo: 'Camión RE-04',
-      ruta: 'Ruta 04',
-      estado: 'pendiente',
-    },
-    {
-      id: 5,
-      punto: 'Hospital Regional',
-      direccion: 'Av. Salud #321',
-      fecha: '2026-01-04',
-      hora: '14:15',
-      conductor: 'María López',
-      vehiculo: 'Camión RE-05',
-      ruta: 'Ruta 05',
-      estado: 'completado',
-    },
-    {
-      id: 6,
-      punto: 'Universidad',
-      direccion: 'Campus Central',
-      fecha: '2026-01-04',
-      hora: '16:30',
-      conductor: 'Roberto Díaz',
-      vehiculo: 'Camión RE-01',
-      ruta: 'Ruta 01',
-      estado: 'completado',
-    },
-  ];
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modoForm, setModoForm] = useState<'CREAR' | 'EDITAR'>('CREAR');
+  const [asignacionSeleccionada, setAsignacionSeleccionada] = useState<HistorialAsignacion | null>(null);
 
-  // Datos únicos para los filtros
-  const rutasUnicas = [...new Set(historial.map(item => item.ruta))];
-  const conductoresUnicos = [...new Set(historial.map(item => item.conductor))];
+  // Conductor: solo puede consultar el historial (sin botones de escritura).
+  const isConductor = getRole() === ROLES.CONDUCTOR;
 
-  const getEstadoIcon = (estado: string) => {
-    switch(estado) {
-      case 'completado': return <FiCheckCircle />;
-      case 'en-proceso': return <FiClock />;
-      case 'retrasado': return <FiAlertCircle />;
-      case 'pendiente': return <FiPauseCircle />;
-      default: return null;
+  // /api/empleados/ requiere rol ADMIN exclusivamente (ver auth_routes.go).
+  // Cualquier otro rol (Coordinador, Operador, Conductor) recibe 403 al
+  // intentar listar empleados, asi que ninguno de ellos puede armar el
+  // catalogo de conductores: no tiene sentido pedirlo ni mostrar el filtro.
+  const canListEmpleados = getRole() === ROLES.ADMIN;
+
+  async function loadAsignaciones() {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await apiRequest<{ data: unknown[] }>('/api/historial-asignacion/');
+      setAsignaciones((response.data ?? []).map(normalizarAsignacion));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cargar el historial de asignacion.');
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
-  const formatFecha = (fecha: string) => {
-    return new Date(fecha).toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
-  };
+  async function loadCamiones() {
+    try {
+      const response = await apiRequest<{ data: Camion[] }>('/api/camion/');
+      setCamiones(response.data ?? []);
+    } catch (err) {
+      // Catalogo secundario: no bloquea la pantalla, pero avisamos por que
+      // el select de camion puede aparecer vacio (ej. 403 por rol).
+      setCatalogWarning((prev) =>
+        prev ?? `No se pudieron cargar los camiones: ${err instanceof Error ? err.message : 'error desconocido'}.`
+      );
+    }
+  }
 
-  const handleFilterClick = (filter: string) => {
+  async function loadConductores() {
+    try {
+      const response = await apiRequest<{ data: unknown[] }>('/api/empleados/');
+      // rol_id === ROLES.CONDUCTOR (core/roles.go). Los conductores de una
+      // asignacion siempre son empleados con este rol.
+      const soloConductores = response.data.filter(
+        (u) => (u as Record<string, unknown>).rol_id === ROLES.CONDUCTOR
+      );
+      setConductores(soloConductores.map(normalizarConductor));
+    } catch (err) {
+      // /api/empleados/ requiere rol ADMIN (ver INFORME_CONEXION_API.md).
+      // Si la cuenta logueada no es ADMIN, este fetch falla y antes se
+      // ignoraba en silencio, por eso el select de conductor parecia vacio
+      // aunque si existieran conductores dados de alta.
+      setCatalogWarning(
+        `No se pudieron cargar los conductores: ${err instanceof Error ? err.message : 'error desconocido'}. ` +
+          `/api/empleados/ requiere rol ADMIN; si tu cuenta tiene otro rol, pide a un admin que los cargue o que se abra el permiso.`
+      );
+    }
+  }
+
+  useEffect(() => {
+    void loadAsignaciones();
+    void loadCamiones();
+    // Solo ADMIN tiene permiso para /api/empleados/: no tiene sentido
+    // pedirlo para otros roles solo para que falle y muestre una advertencia.
+    if (canListEmpleados) {
+      void loadConductores();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const getPlaca = (id_camion: number) =>
+    camiones.find((c) => c.camion_id === id_camion)?.placa ?? `Camion #${id_camion}`;
+
+  const getConductorNombre = (id_chofer: number) =>
+    conductores.find((c) => c.id === id_chofer)?.nombre ?? `Conductor #${id_chofer}`;
+
+  const handleFilterClick = (filter: 'todos' | 'activa' | 'finalizada') => {
     setActiveFilter(filter);
   };
 
   const handleLimpiarFiltros = () => {
-    setSelectedDate('');
-    setSelectedRuta('');
+    setSelectedCamion('');
     setSelectedConductor('');
     setActiveFilter('todos');
     setSearchTerm('');
   };
 
-  // Filtrar el historial
-  const historialFiltrado = historial.filter(item => {
-    // Filtro por estado (filtros rápidos)
-    if (activeFilter !== 'todos' && item.estado !== activeFilter) return false;
-    
-    // Filtro por fecha
-    if (selectedDate && item.fecha !== selectedDate) return false;
-    
-    // Filtro por ruta
-    if (selectedRuta && item.ruta !== selectedRuta) return false;
-    
-    // Filtro por conductor
-    if (selectedConductor && item.conductor !== selectedConductor) return false;
-    
-    // Filtro por búsqueda
-    if (searchTerm && !item.punto.toLowerCase().includes(searchTerm.toLowerCase()) && 
-        !item.conductor.toLowerCase().includes(searchTerm.toLowerCase()) &&
-        !item.vehiculo.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    
-    return true;
-  });
+  const asignacionesFiltradas = useMemo(() => {
+    return asignaciones.filter((item) => {
+      const estado = item.fecha_baja ? 'finalizada' : 'activa';
+      if (activeFilter !== 'todos' && estado !== activeFilter) return false;
+
+      if (selectedCamion && String(item.id_camion) !== selectedCamion) return false;
+      if (selectedConductor && String(item.id_chofer) !== selectedConductor) return false;
+
+      if (searchTerm) {
+        const q = searchTerm.toLowerCase();
+        const placa = getPlaca(item.id_camion).toLowerCase();
+        const conductor = getConductorNombre(item.id_chofer).toLowerCase();
+        if (!placa.includes(q) && !conductor.includes(q)) return false;
+      }
+
+      return true;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asignaciones, activeFilter, selectedCamion, selectedConductor, searchTerm, camiones, conductores]);
+
+  const totalPaginas = Math.max(1, Math.ceil(asignacionesFiltradas.length / ITEMS_POR_PAGINA));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const asignacionesPagina = asignacionesFiltradas.slice(
+    (paginaActual - 1) * ITEMS_POR_PAGINA,
+    paginaActual * ITEMS_POR_PAGINA,
+  );
+
+  useEffect(() => {
+    setPagina(1);
+  }, [activeFilter, selectedCamion, selectedConductor, searchTerm]);
+
+  const resumen = useMemo(() => {
+    const total = asignaciones.length;
+    const activas = asignaciones.filter((a) => !a.fecha_baja).length;
+    return { total, activas, finalizadas: total - activas };
+  }, [asignaciones]);
+
+  function abrirCrear() {
+    setModoForm('CREAR');
+    setAsignacionSeleccionada(null);
+    setModalOpen(true);
+  }
+
+  function abrirEditar(asignacion: HistorialAsignacion) {
+    setModoForm('EDITAR');
+    setAsignacionSeleccionada(asignacion);
+    setModalOpen(true);
+  }
+
+  function cerrarModal() {
+    setModalOpen(false);
+  }
+
+  async function onSubmitForm(data: AsignacionPayload) {
+    setSaving(true);
+    setError(null);
+
+    try {
+      if (modoForm === 'CREAR') {
+        await apiRequest('/api/historial-asignacion/', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        });
+      } else if (asignacionSeleccionada) {
+        await apiRequest(`/api/historial-asignacion/${asignacionSeleccionada.id_historial}`, {
+          method: 'PUT',
+          body: JSON.stringify(data),
+        });
+      }
+
+      setModalOpen(false);
+      await loadAsignaciones();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar la asignacion.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function darDeBaja(asignacion: HistorialAsignacion) {
+    const ok = confirm(
+      `Dar de baja la asignacion de ${getConductorNombre(asignacion.id_chofer)} en ${getPlaca(asignacion.id_camion)}?`
+    );
+    if (!ok) return;
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      await apiRequest(`/api/historial-asignacion/${asignacion.id_historial}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          id_camion: asignacion.id_camion,
+          id_chofer: asignacion.id_chofer,
+          fecha_asignacion: asignacion.fecha_asignacion,
+          fecha_baja: new Date().toISOString().slice(0, 10),
+        }),
+      });
+      await loadAsignaciones();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo dar de baja la asignacion.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function eliminarAsignacion(id_historial: number) {
+    const ok = confirm('Seguro que deseas eliminar esta asignacion del historial?');
+    if (!ok) return;
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      await apiRequest(`/api/historial-asignacion/${id_historial}`, { method: 'DELETE' });
+      await loadAsignaciones();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo eliminar la asignacion.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const formatFecha = (fecha: string) => {
+    if (!fecha) return '-';
+    const d = new Date(fecha);
+    if (Number.isNaN(d.getTime())) return fecha;
+    return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
 
   return (
     <div className="historial-container">
       <div className="historial">
-        {/* Sección 1: Header con estadísticas */}
+        {/* Seccion 1: Header con estadisticas */}
         <header className="historial-header">
           <div className="historial header-content">
             <div className="historial header-title">
-              <h1>Historial de Recolecciones</h1>
-              <p className="historial subtitle">Seguimiento y análisis de rutas completadas</p>
+              <h1>Historial de Asignacion</h1>
+              <p className="historial subtitle">Conductores asignados a cada camion, con fecha de alta y baja</p>
             </div>
-            
+
             <div className="historial header-stats">
               <div className="historial stat-card">
                 <div className="historial stat-icon">
                   <FiTruck />
                 </div>
                 <div>
-                  <span className="historial stat-value">{historial.length}</span>
-                  <span className="historial stat-label">Recolecciones totales</span>
+                  <span className="historial stat-value">{resumen.total}</span>
+                  <span className="historial stat-label">Asignaciones totales</span>
                 </div>
               </div>
-              
+
               <div className="historial stat-card">
                 <div className="historial stat-icon">
                   <FiCheckCircle />
                 </div>
                 <div>
-                  <span className="historial stat-value">
-                    {historial.filter(h => h.estado === 'completado').length}
-                  </span>
-                  <span className="historial stat-label">Completadas</span>
+                  <span className="historial stat-value">{resumen.activas}</span>
+                  <span className="historial stat-label">Activas</span>
                 </div>
               </div>
-              
+
               <div className="historial stat-card">
                 <div className="historial stat-icon">
                   <FiClock />
                 </div>
                 <div>
-                  <span className="historial stat-value">
-                    {historial.filter(h => h.estado === 'en-proceso').length}
-                  </span>
-                  <span className="historial stat-label">En proceso</span>
+                  <span className="historial stat-value">{resumen.finalizadas}</span>
+                  <span className="historial stat-label">Finalizadas</span>
                 </div>
               </div>
             </div>
           </div>
         </header>
 
-        {/* Sección 2: Todos los filtros en un solo cuadro */}
+        {/* Seccion 2: Filtros + accion de crear */}
         <div className="historial filtros-container">
           <div className="historial filtros-header">
-            <h3 className="historial filtros-title">Filtros de Recolección</h3>
-            <button className="historial btn-limpiar" onClick={handleLimpiarFiltros}>
-              <FiX />
-              <span>Limpiar todos</span>
-            </button>
+            <h3 className="historial filtros-title">Filtros de Asignacion</h3>
+            <div className="historial filtros-header-actions">
+              <button className="historial btn-limpiar" onClick={handleLimpiarFiltros}>
+                <FiX />
+                <span>Limpiar todos</span>
+              </button>
+              {!isConductor && (
+                <button className="historial btn-nueva" onClick={abrirCrear} disabled={saving}>
+                  <FiPlus />
+                  <span>Nueva asignacion</span>
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="historial filtros-grid">
-            {/* Filtro por fecha */}
-            <div className="historial filtro-group">
-              <div className="historial filtro-label">
-                <FiCalendar />
-                <span>Fecha de recolección:</span>
-              </div>
-              <input 
-                type="date" 
-                className="historial filtro-fecha-input"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-              />
-            </div>
-
-            {/* Filtro por ruta */}
+            {/* Filtro por camion */}
             <div className="historial filtro-group">
               <div className="historial filtro-label">
                 <FiTruck />
-                <span>Ruta:</span>
+                <span>Camion:</span>
               </div>
-              <select 
+              <select
                 className="historial filtro-select"
-                value={selectedRuta}
-                onChange={(e) => setSelectedRuta(e.target.value)}
+                value={selectedCamion}
+                onChange={(e) => setSelectedCamion(e.target.value)}
               >
-                <option value="">Todas las rutas</option>
-                {rutasUnicas.map(ruta => (
-                  <option key={ruta} value={ruta}>{ruta}</option>
+                <option value="">Todos los camiones</option>
+                {camiones.map((c) => (
+                  <option key={c.camion_id} value={c.camion_id}>
+                    {c.placa}
+                  </option>
                 ))}
               </select>
             </div>
 
-            {/* Filtro por conductor */}
+            {/* Filtro por conductor: solo ADMIN tiene permiso para listar
+                /api/empleados/, asi que solo a ese rol tiene sentido
+                mostrarle este filtro. */}
+            {canListEmpleados && (
             <div className="historial filtro-group">
               <div className="historial filtro-label">
                 <FiUser />
                 <span>Conductor:</span>
               </div>
-              <select 
+              <select
                 className="historial filtro-select"
                 value={selectedConductor}
                 onChange={(e) => setSelectedConductor(e.target.value)}
               >
                 <option value="">Todos los conductores</option>
-                {conductoresUnicos.map(conductor => (
-                  <option key={conductor} value={conductor}>{conductor}</option>
+                {conductores.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                  </option>
                 ))}
               </select>
             </div>
+            )}
 
-            {/* Filtros rápidos por estado */}
+            {/* Filtros rapidos por estado */}
             <div className="historial filtro-group historial full-width">
               <div className="historial filtro-label">
                 <span>Estado:</span>
               </div>
               <div className="historial filtros-rapidos">
-                <button 
+                <button
                   className={`historial quick-filter-btn ${activeFilter === 'todos' ? 'historial active' : ''}`}
                   onClick={() => handleFilterClick('todos')}
                 >
                   Todos
                 </button>
-                <button 
-                  className={`historial quick-filter-btn ${activeFilter === 'completado' ? 'historial active' : ''}`}
-                  onClick={() => handleFilterClick('completado')}
+                <button
+                  className={`historial quick-filter-btn ${activeFilter === 'activa' ? 'historial active' : ''}`}
+                  onClick={() => handleFilterClick('activa')}
                 >
                   <FiCheckCircle />
-                  Completados
+                  Activas
                 </button>
-                <button 
-                  className={`historial quick-filter-btn ${activeFilter === 'en-proceso' ? 'historial active' : ''}`}
-                  onClick={() => handleFilterClick('en-proceso')}
+                <button
+                  className={`historial quick-filter-btn ${activeFilter === 'finalizada' ? 'historial active' : ''}`}
+                  onClick={() => handleFilterClick('finalizada')}
                 >
                   <FiClock />
-                  En proceso
-                </button>
-                <button 
-                  className={`historial quick-filter-btn ${activeFilter === 'pendiente' ? 'historial active' : ''}`}
-                  onClick={() => handleFilterClick('pendiente')}
-                >
-                  <FiPauseCircle />
-                  Pendientes
-                </button>
-                <button 
-                  className={`historial quick-filter-btn ${activeFilter === 'retrasado' ? 'historial active' : ''}`}
-                  onClick={() => handleFilterClick('retrasado')}
-                >
-                  <FiAlertCircle />
-                  Retrasados
+                  Finalizadas
                 </button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Sección 3: Tabla de datos */}
+        {error && <div className="historial form-error">{error}</div>}
+        {catalogWarning && <div className="historial form-warning">{catalogWarning}</div>}
+
+        {/* Seccion 3: Tabla de datos */}
         <div className="historial table-container">
           <div className="historial table-header">
             <div className="historial table-summary">
-              Mostrando {historialFiltrado.length} de {historial.length} recolecciones
+              Mostrando {asignacionesFiltradas.length} de {asignaciones.length} asignaciones
             </div>
             <div className="historial table-search">
               <FiSearch className="historial search-icon" />
-              <input 
-                type="text" 
-                placeholder="Buscar por punto, conductor o vehículo..."
+              <input
+                type="text"
+                placeholder="Buscar por camion o conductor..."
                 className="historial search-input"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -319,83 +469,73 @@ export default function Historial() {
             </div>
           </div>
 
-          <div className="historial table-wrapper">
-            <table className="historial historial-table">
-              <thead>
-                <tr>
-                  <th>Punto de recolección</th>
-                  <th>Fecha y hora</th>
-                  <th>Conductor</th>
-                  <th>Ruta / Vehículo</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {historialFiltrado.map((item) => (
-                  <tr key={item.id} className="historial table-row">
-                    <td className="historial punto-cell">
-                      <div className="historial punto-info">
-                        <div className="historial punto-nombre">{item.punto}</div>
-                        <div className="historial punto-direccion">{item.direccion}</div>
-                      </div>
-                    </td>
-                    <td className="historial fecha-cell">
-                      <div className="historial fecha-info">
-                        <div className="historial fecha">{formatFecha(item.fecha)}</div>
-                        <div className="historial hora">{item.hora}</div>
-                      </div>
-                    </td>
-                    <td className="historial conductor-cell">
-                      <div className="historial conductor-info">
-                        <div className="historial conductor-nombre">{item.conductor}</div>
-                      </div>
-                    </td>
-                    <td className="historial ruta-cell">
-                      <div className="historial ruta-info">
-                        <div className="historial ruta-numero">{item.ruta}</div>
-                        <div className="historial vehiculo">{item.vehiculo}</div>
-                      </div>
-                    </td>
-                    <td className="historial estado-cell">
-                      <div className={`historial estado-badge historial estado-${item.estado}`}>
-                        {getEstadoIcon(item.estado)}
-                        <span>
-                          {item.estado === 'completado' ? 'Completado' :
-                           item.estado === 'en-proceso' ? 'En proceso' :
-                           item.estado === 'retrasado' ? 'Retrasado' : 'Pendiente'}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="historial acciones-cell">
-                      <button className="historial btn-detalles">
-                        <FiEye />
-                        <span>Ver</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {loading ? (
+            <div className="historial empty-state">Cargando historial de asignacion...</div>
+          ) : (
+            <AsignacionTable
+              asignaciones={asignacionesPagina}
+              getPlaca={getPlaca}
+              getConductorNombre={getConductorNombre}
+              formatFecha={formatFecha}
+              onEditar={abrirEditar}
+              onDarDeBaja={darDeBaja}
+              onEliminar={eliminarAsignacion}
+              readOnly={isConductor}
+            />
+          )}
 
-          {/* Paginación */}
-          <div className="historial pagination">
-            <button className="historial pagination-btn" disabled>
-              Anterior
-            </button>
-            <div className="historial pagination-pages">
-              <button className="historial page-btn historial active">1</button>
-              <button className="historial page-btn">2</button>
-              <button className="historial page-btn">3</button>
-              <span className="historial page-dots">...</span>
-              <button className="historial page-btn">5</button>
+          {!loading && totalPaginas > 1 && (
+            <div className="historial table-pagination">
+              <button
+                type="button"
+                className="historial pagination-btn"
+                onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                disabled={paginaActual === 1}
+              >
+                <FiChevronLeft />
+                <span>Anterior</span>
+              </button>
+
+              <span className="historial pagination-info">
+                Página {paginaActual} de {totalPaginas}
+              </span>
+
+              <button
+                type="button"
+                className="historial pagination-btn"
+                onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                disabled={paginaActual === totalPaginas}
+              >
+                <span>Siguiente</span>
+                <FiChevronRight />
+              </button>
             </div>
-            <button className="historial pagination-btn">
-              Siguiente
-            </button>
-          </div>
+          )}
         </div>
+
+        {modalOpen && (
+          <div className="historial modal-overlay" onMouseDown={cerrarModal}>
+            <div className="historial modal" onMouseDown={(e) => e.stopPropagation()}>
+              <div className="historial modal-header">
+                <h2>{modoForm === 'CREAR' ? 'Nueva asignacion' : 'Editar asignacion'}</h2>
+                <button className="historial modal-close" onClick={cerrarModal}>
+                  X
+                </button>
+              </div>
+
+              <AsignacionForm
+                key={asignacionSeleccionada?.id_historial ?? 'new'}
+                modo={modoForm}
+                asignacion={asignacionSeleccionada}
+                camiones={camiones}
+                conductores={conductores}
+                saving={saving}
+                onCancel={cerrarModal}
+                onSubmit={onSubmitForm}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

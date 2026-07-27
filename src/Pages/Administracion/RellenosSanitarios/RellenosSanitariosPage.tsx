@@ -1,11 +1,13 @@
 // src/Pages/Administracion/RellenosSanitarios/RellenosSanitariosPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { FiPlus, FiDownload, FiX, FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import "./RellenosSanitariosPage.css";
 
 import RellenoForm from "./components/RellenoForm";
 import RellenosSanitariosTable from "./components/RellenosTable";
-import { apiRequest, ApiError } from "../../../services/api";
+import { apiRequest, ApiError, getRole } from "../../../services/api";
+import { ROLES } from "../../../services/auth";
 
 // Modelo tal como lo devuelve la API (GET /api/relleno-sanitario/)
 export interface RellenoSanitario {
@@ -24,6 +26,8 @@ export interface RellenoSanitarioPayload {
   es_rentado: boolean;
   capacidad_toneladas: number;
 }
+
+const ITEMS_POR_PAGINA = 10;
 
 function mensajeError(err: unknown, fallback: string): string {
   if (err instanceof ApiError) {
@@ -44,9 +48,13 @@ export default function RellenosSanitariosPage() {
 
   const [search, setSearch] = useState("");
   const [filtroTipo, setFiltroTipo] = useState<"Todos" | "Rentado" | "Propio">("Todos");
+  const [pagina, setPagina] = useState(1);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRelleno, setEditingRelleno] = useState<RellenoSanitario | null>(null);
+
+  // Conductor: solo puede consultar el listado de rellenos, no crear/editar/eliminar.
+  const isConductor = getRole() === ROLES.CONDUCTOR;
 
   async function loadRellenos() {
     setLoading(true);
@@ -91,6 +99,17 @@ export default function RellenosSanitariosPage() {
       return matchSearch && matchTipo;
     });
   }, [rellenos, search, filtroTipo]);
+
+  const totalPaginas = Math.max(1, Math.ceil(filteredRellenos.length / ITEMS_POR_PAGINA));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const rellenosPagina = filteredRellenos.slice(
+    (paginaActual - 1) * ITEMS_POR_PAGINA,
+    paginaActual * ITEMS_POR_PAGINA,
+  );
+
+  useEffect(() => {
+    setPagina(1);
+  }, [search, filtroTipo]);
 
   // =========================
   // Cards resumen
@@ -228,19 +247,6 @@ export default function RellenosSanitariosPage() {
       </div>
 
       {/* =======================
-          BOTONES PRINCIPALES
-      ======================= */}
-      <div className="rs-actions">
-        <button className="rs-btn rs-btn-secondary" onClick={() => void loadRellenos()}>
-          📋 Ver Rellenos
-        </button>
-
-        <button className="rs-btn rs-btn-primary" onClick={openCreate} disabled={saving}>
-          ➕ Crear Relleno
-        </button>
-      </div>
-
-      {/* =======================
           FILTROS
       ======================= */}
       <div className="rs-filters">
@@ -276,8 +282,16 @@ export default function RellenosSanitariosPage() {
           />
 
           <button className="rs-btn rs-btn-outline" onClick={handleExport}>
-            ⬇ Exportar
+            <FiDownload />
+            <span>Exportar</span>
           </button>
+
+          {!isConductor && (
+            <button className="rs-btn rs-btn-primary" onClick={openCreate} disabled={saving}>
+              <FiPlus />
+              <span>Crear Relleno</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -299,16 +313,47 @@ export default function RellenosSanitariosPage() {
         {loading ? (
           <div className="rs-loading">Cargando rellenos sanitarios...</div>
         ) : (
-          <RellenosSanitariosTable
-            data={filteredRellenos}
-            onEdit={openEdit}
-            onDelete={handleDelete}
-            onDetails={(relleno) => {
-              alert(
-                `Detalles:\n\nNombre: ${relleno.nombre}\nDirección: ${relleno.direccion}\nCapacidad: ${relleno.capacidad_toneladas} ton\nTipo: ${relleno.es_rentado ? "Rentado" : "Propio"}`
-              );
-            }}
-          />
+          <>
+            <RellenosSanitariosTable
+              data={rellenosPagina}
+              onEdit={openEdit}
+              onDelete={handleDelete}
+              readOnly={isConductor}
+              onDetails={(relleno) => {
+                alert(
+                  `Detalles:\n\nNombre: ${relleno.nombre}\nDirección: ${relleno.direccion}\nCapacidad: ${relleno.capacidad_toneladas} ton\nTipo: ${relleno.es_rentado ? "Rentado" : "Propio"}`
+                );
+              }}
+            />
+
+            {totalPaginas > 1 && (
+              <div className="rs-table-pagination">
+                <button
+                  type="button"
+                  className="rs-pagination-btn"
+                  onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                  disabled={paginaActual === 1}
+                >
+                  <FiChevronLeft />
+                  <span>Anterior</span>
+                </button>
+
+                <span className="rs-pagination-info">
+                  Página {paginaActual} de {totalPaginas}
+                </span>
+
+                <button
+                  type="button"
+                  className="rs-pagination-btn"
+                  onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                  disabled={paginaActual === totalPaginas}
+                >
+                  <span>Siguiente</span>
+                  <FiChevronRight />
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -326,7 +371,7 @@ export default function RellenosSanitariosPage() {
                 {editingRelleno ? "Editar Relleno" : "Crear Relleno"}
               </h2>
               <button className="rs-modal-close" onClick={closeModal} disabled={saving}>
-                ✕
+                <FiX />
               </button>
             </div>
 

@@ -4,6 +4,7 @@
 const BASE_URL = "";
 const TOKEN_KEY = "auth_token";
 const ROLE_KEY = "auth_role";
+const NAME_KEY = "auth_name";
 
 
 
@@ -38,9 +39,24 @@ export function clearRole(): void {
   localStorage.removeItem(ROLE_KEY);
 }
 
+// Nombre completo del empleado, tal como viene en data.nombre/data.apellidos
+// de /api/empleados/login. Solo se usa para mostrarlo en el menú de usuario.
+export function getUserName(): string | null {
+  return localStorage.getItem(NAME_KEY);
+}
+
+export function setUserName(name: string): void {
+  localStorage.setItem(NAME_KEY, name);
+}
+
+export function clearUserName(): void {
+  localStorage.removeItem(NAME_KEY);
+}
+
 export function clearSession(): void {
   clearToken();
   clearRole();
+  clearUserName();
 }
 
 // El backend responde errores en dos formas distintas según el middleware:

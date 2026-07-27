@@ -1,9 +1,10 @@
 // src/Pages/Administracion/Camiones/CamionesPage.tsx
 import { useEffect, useMemo, useState } from "react";
-import { FaTruck, FaCheckCircle, FaPlus, FaList, FaFileExport } from "react-icons/fa";
+import { FiTruck, FiCheckCircle, FiPlus, FiDownload, FiX, FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import CamionesTable from "./components/CamionesTable";
 import CamionForm from "./components/CamionForm";
-import { apiRequest } from "../../../services/api";
+import { apiRequest, getRole } from "../../../services/api";
+import { ROLES } from "../../../services/auth";
 import "./CamionesPage.css";
 
 export interface TipoCamion {
@@ -48,6 +49,8 @@ export const ESTADOS_DISPONIBILIDAD = [
   { id: 4, nombre: "BAJA", label: "Baja", color: "#757575" },
 ] as const;
 
+const ITEMS_POR_PAGINA = 10;
+
 export default function CamionesPage() {
   const [camiones, setCamiones] = useState<Camion[]>([]);
   const [tiposCamion, setTiposCamion] = useState<TipoCamion[]>([]);
@@ -58,11 +61,15 @@ export default function CamionesPage() {
   const [search, setSearch] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState("TODOS");
   const [soloRentados, setSoloRentados] = useState(false);
+  const [pagina, setPagina] = useState(1);
 
   // Modal / Form
   const [modalOpen, setModalOpen] = useState(false);
   const [modoForm, setModoForm] = useState<"CREAR" | "EDITAR">("CREAR");
   const [camionSeleccionado, setCamionSeleccionado] = useState<Camion | null>(null);
+
+  // Conductor: solo puede consultar el listado de camiones, no crear/editar/eliminar.
+  const isConductor = getRole() === ROLES.CONDUCTOR;
 
   async function loadCamiones() {
     setLoading(true);
@@ -122,6 +129,17 @@ export default function CamionesPage() {
         );
       });
   }, [camiones, estadoFiltro, soloRentados, search, tiposCamion]);
+
+  const totalPaginas = Math.max(1, Math.ceil(camionesFiltrados.length / ITEMS_POR_PAGINA));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const camionesPagina = camionesFiltrados.slice(
+    (paginaActual - 1) * ITEMS_POR_PAGINA,
+    paginaActual * ITEMS_POR_PAGINA,
+  );
+
+  useEffect(() => {
+    setPagina(1);
+  }, [estadoFiltro, soloRentados, search]);
 
   const resumen = useMemo(() => {
     const total = camiones.length;
@@ -225,7 +243,7 @@ export default function CamionesPage() {
           <div className="camiones admin-header-cards">
             <div className="camiones mini-card">
               <div className="camiones mini-card-icon">
-                <FaTruck />
+                <FiTruck />
               </div>
               <div>
                 <h3 className="camiones mini-card-value">{resumen.total}</h3>
@@ -235,7 +253,7 @@ export default function CamionesPage() {
 
             <div className="camiones mini-card">
               <div className="camiones mini-card-icon ok">
-                <FaCheckCircle />
+                <FiCheckCircle />
               </div>
               <div>
                 <h3 className="camiones mini-card-value">{resumen.rentados}</h3>
@@ -243,18 +261,6 @@ export default function CamionesPage() {
               </div>
             </div>
           </div>
-        </section>
-
-        <section className="camiones admin-actions-bar">
-          <button className="camiones btn camiones btn-light" onClick={() => void loadCamiones()}>
-            <FaList />
-            Ver Camiones
-          </button>
-
-          <button className="camiones btn camiones btn-primary" onClick={abrirCrear} disabled={saving}>
-            <FaPlus />
-            Crear Camión
-          </button>
         </section>
 
         <section className="camiones admin-filters">
@@ -297,9 +303,16 @@ export default function CamionesPage() {
             />
 
             <button className="camiones btn camiones btn-outline" onClick={exportarCSV}>
-              <FaFileExport />
-              Exportar
+              <FiDownload />
+              <span>Exportar</span>
             </button>
+
+            {!isConductor && (
+              <button className="camiones btn camiones btn-primary" onClick={abrirCrear} disabled={saving}>
+                <FiPlus />
+                <span>Crear Camión</span>
+              </button>
+            )}
           </div>
         </section>
 
@@ -316,12 +329,43 @@ export default function CamionesPage() {
           {loading ? (
             <div className="camiones empty-state">Cargando camiones...</div>
           ) : (
-            <CamionesTable
-              camiones={camionesFiltrados}
-              tiposCamion={tiposCamion}
-              onEditar={abrirEditar}
-              onEliminar={eliminarCamion}
-            />
+            <>
+              <CamionesTable
+                camiones={camionesPagina}
+                tiposCamion={tiposCamion}
+                onEditar={abrirEditar}
+                onEliminar={eliminarCamion}
+                readOnly={isConductor}
+              />
+
+              {totalPaginas > 1 && (
+                <div className="camiones table-pagination">
+                  <button
+                    type="button"
+                    className="camiones pagination-btn"
+                    onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                    disabled={paginaActual === 1}
+                  >
+                    <FiChevronLeft />
+                    <span>Anterior</span>
+                  </button>
+
+                  <span className="camiones pagination-info">
+                    Página {paginaActual} de {totalPaginas}
+                  </span>
+
+                  <button
+                    type="button"
+                    className="camiones pagination-btn"
+                    onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                    disabled={paginaActual === totalPaginas}
+                  >
+                    <span>Siguiente</span>
+                    <FiChevronRight />
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </section>
 
@@ -331,7 +375,7 @@ export default function CamionesPage() {
               <div className="camiones modal-header">
                 <h2>{modoForm === "CREAR" ? "Crear Camión" : "Editar Camión"}</h2>
                 <button className="camiones modal-close" onClick={cerrarModal}>
-                  ✕
+                  <FiX />
                 </button>
               </div>
 

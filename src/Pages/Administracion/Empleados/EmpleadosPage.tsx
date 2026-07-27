@@ -1,26 +1,30 @@
 import { useEffect, useMemo, useState } from "react";
-import { FaDownload, FaPlus, FaUsers } from "react-icons/fa";
+import { FiDownload, FiPlus, FiUsers, FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import EmpleadoForm from "./components/EmpleadoForm";
 import EmpleadosTable from "./components/EmpleadosTable";
 import "./EmpleadosPage.css";
 import { apiRequest } from "../../../services/api";
+import { ROLE_NAMES, type RoleId } from "../../../services/auth";
 
 export interface Empleado {
   id: number;
   nombre: string;
+  apellidos: string;
   email: string;
-  alias: string | null;
-  telefono: string | null;
+  username: string;
   created_at: string;
+  rolId: number;
 }
 
-export interface EmpleadoCreatePayload {
+const ITEMS_POR_PAGINA = 10;
+
+export interface EmpleadoFormValues {
   nombre: string;
   apellidos: string;
   mail: string;
   username: string;
   password: string;
-  rol_id: 4;
+  rol_id: RoleId;
 }
 
 function normalizarEmpleado(raw: unknown): Empleado {
@@ -28,10 +32,11 @@ function normalizarEmpleado(raw: unknown): Empleado {
   return {
     id: Number(s.id ?? 0),
     nombre: typeof s.nombre === "string" ? s.nombre : "",
+    apellidos: typeof s.apellidos === "string" ? s.apellidos : "",
     email: typeof s.mail === "string" ? s.mail : "",
-    alias: typeof s.alias === "string" ? s.alias : null,
-    telefono: typeof s.telefono === "string" ? s.telefono : null,
+    username: typeof s.username === "string" ? s.username : "",
     created_at: typeof s.created_at === "string" ? s.created_at : "",
+    rolId: Number(s.rol_id ?? 0),
   };
 }
 
@@ -40,8 +45,10 @@ export default function EmpleadosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [roleFilter, setRoleFilter] = useState<RoleId | "todos">("todos");
+  const [modal, setModal] = useState<{ modo: "CREAR" | "EDITAR"; empleado: Empleado | null } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [pagina, setPagina] = useState(1);
 
   async function loadEmpleados() {
     setLoading(true);
@@ -49,10 +56,7 @@ export default function EmpleadosPage() {
 
     try {
       const response = await apiRequest<{ data: unknown[] }>("/api/empleados/");
-      const soloEmpleados = response.data.filter(
-        (u) => (u as Record<string, unknown>).rol_id === 4
-      );
-      setEmpleados(soloEmpleados.map(normalizarEmpleado));
+      setEmpleados(response.data.map(normalizarEmpleado));
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudieron cargar los empleados.");
     } finally {
@@ -66,26 +70,51 @@ export default function EmpleadosPage() {
 
   const filteredEmpleados = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (q.length === 0) return empleados;
 
-    return empleados.filter((e) =>
-      e.nombre.toLowerCase().includes(q) ||
-      e.email.toLowerCase().includes(q)
-    );
-  }, [empleados, search]);
+    return empleados.filter((e) => {
+      if (roleFilter !== "todos" && e.rolId !== roleFilter) return false;
+      if (q.length === 0) return true;
+      return e.nombre.toLowerCase().includes(q) || e.email.toLowerCase().includes(q);
+    });
+  }, [empleados, search, roleFilter]);
 
-  const openCreate = () => setIsModalOpen(true);
-  const closeModal = () => setIsModalOpen(false);
+  const totalPaginas = Math.max(1, Math.ceil(filteredEmpleados.length / ITEMS_POR_PAGINA));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const empleadosPagina = filteredEmpleados.slice(
+    (paginaActual - 1) * ITEMS_POR_PAGINA,
+    paginaActual * ITEMS_POR_PAGINA,
+  );
 
-  const handleSave = async (payload: EmpleadoCreatePayload) => {
+  useEffect(() => {
+    setPagina(1);
+  }, [search, roleFilter]);
+
+  const openCreate = () => setModal({ modo: "CREAR", empleado: null });
+  const openEdit = (empleado: Empleado) => setModal({ modo: "EDITAR", empleado });
+  const closeModal = () => setModal(null);
+
+  const handleSave = async (values: EmpleadoFormValues) => {
+    if (!modal) return;
+
     setSaving(true);
     setError(null);
 
     try {
-      await apiRequest("/api/empleados/", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+      if (modal.modo === "CREAR") {
+        await apiRequest("/api/empleados/", {
+          method: "POST",
+          body: JSON.stringify(values),
+        });
+      } else {
+        // password vacío = no cambiarla; el backend acepta updates parciales.
+        const { password, ...rest } = values;
+        const payload = password ? values : rest;
+
+        await apiRequest(`/api/empleados/${modal.empleado!.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        });
+      }
 
       closeModal();
       await loadEmpleados();
@@ -117,11 +146,12 @@ export default function EmpleadosPage() {
   };
 
   const handleExport = () => {
-    const headers = ["ID", "Nombre", "Email", "Fecha Registro"];
+    const headers = ["ID", "Nombre", "Email", "Rol", "Fecha Registro"];
     const rows = filteredEmpleados.map((e) => [
       e.id,
       e.nombre,
       e.email,
+      ROLE_NAMES[e.rolId as RoleId] ?? "—",
       e.created_at,
     ]);
 
@@ -152,7 +182,7 @@ export default function EmpleadosPage() {
           <div className="emp-cards">
             <div className="emp-card">
               <div className="emp-card-icon">
-                <FaUsers />
+                <FiUsers />
               </div>
               <div>
                 <h3>{empleados.length}</h3>
@@ -162,16 +192,6 @@ export default function EmpleadosPage() {
           </div>
         </section>
 
-        <section className="emp-actions">
-          <button className="emp-btn secondary" onClick={handleExport}>
-            <FaDownload /> Exportar
-          </button>
-
-          <button className="emp-btn primary" onClick={openCreate} disabled={saving}>
-            <FaPlus /> Nuevo empleado
-          </button>
-        </section>
-
         <section className="emp-toolbar">
           <input
             className="emp-search"
@@ -179,6 +199,29 @@ export default function EmpleadosPage() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nombre o email..."
           />
+
+          <select
+            className="emp-role-filter"
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value === "todos" ? "todos" : (Number(e.target.value) as RoleId))}
+          >
+            <option value="todos">Todos los roles</option>
+            {(Object.entries(ROLE_NAMES) as [string, string][]).map(([id, nombre]) => (
+              <option key={id} value={id}>
+                {nombre}
+              </option>
+            ))}
+          </select>
+
+          <div className="emp-toolbar-actions">
+            <button className="emp-btn secondary" onClick={handleExport}>
+              <FiDownload /> Exportar
+            </button>
+
+            <button className="emp-btn primary" onClick={openCreate} disabled={saving}>
+              <FiPlus /> Nuevo empleado
+            </button>
+          </div>
         </section>
 
         {error && <div className="emp-alert">{error}</div>}
@@ -186,15 +229,47 @@ export default function EmpleadosPage() {
         {loading ? (
           <div className="emp-loading">Cargando empleados...</div>
         ) : (
-          <EmpleadosTable data={filteredEmpleados} onDelete={handleDelete} />
+          <>
+            <EmpleadosTable data={empleadosPagina} onDelete={handleDelete} onEdit={openEdit} />
+
+            {totalPaginas > 1 && (
+              <div className="emp-pagination">
+                <button
+                  type="button"
+                  className="emp-pagination-btn"
+                  onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                  disabled={paginaActual === 1}
+                >
+                  <FiChevronLeft />
+                  <span>Anterior</span>
+                </button>
+
+                <span className="emp-pagination-info">
+                  Página {paginaActual} de {totalPaginas}
+                </span>
+
+                <button
+                  type="button"
+                  className="emp-pagination-btn"
+                  onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                  disabled={paginaActual === totalPaginas}
+                >
+                  <span>Siguiente</span>
+                  <FiChevronRight />
+                </button>
+              </div>
+            )}
+          </>
         )}
 
-        {isModalOpen && (
+        {modal && (
           <div className="emp-modal-overlay" onClick={closeModal}>
             <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
-              <h2>Nuevo empleado</h2>
+              <h2>{modal.modo === "CREAR" ? "Nuevo empleado" : "Editar empleado"}</h2>
 
               <EmpleadoForm
+                modo={modal.modo}
+                empleado={modal.empleado}
                 onCancel={closeModal}
                 onSave={handleSave}
                 saving={saving}
