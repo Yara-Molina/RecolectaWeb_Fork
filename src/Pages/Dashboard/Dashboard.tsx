@@ -40,15 +40,6 @@ interface PuntoRuta {
   direccionCompleta: DireccionCompleta | null;
 }
 
-interface DireccionCompleta {
-  display_name: string;
-  calle?: string | null;
-  cp?: string | null;
-  colonia?: string | null;
-  municipio?: string | null;
-  estado?: string | null;
-}
-
 interface Conductor {
   id: number;
   nombre: string;
@@ -106,10 +97,9 @@ export default function Dashboard() {
         const data = response.data || response;
         if (Array.isArray(data)) {
           const listaConductores = data
-            .filter((emp: any) => emp.rol_id === 2)
+            .filter((emp: any) => emp.rol_id === 2 || emp.rol_id === 4)
             .map((emp: any) => ({ id: emp.id, nombre: `${emp.nombre || ''} ${emp.apellidos || emp.apellido || ''}`.trim(), email: emp.mail || emp.email || '' }));
           setConductores(listaConductores);
-          console.log('Conductores cargados:', listaConductores.length);
         }
       } catch (err) {
         console.error('Error cargando conductores:', err);
@@ -324,6 +314,7 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
+
       </div>
     </div>
   );

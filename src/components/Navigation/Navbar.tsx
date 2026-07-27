@@ -51,12 +51,9 @@ export default function Navbar() {
   const allNavItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', path: '/dashboard', section: 'dashboard' },
     { id: 'historial', label: 'Historial', path: '/historial', section: 'historial' },
-    // Alertas: oculta del navbar por decisión de producto, la ruta y la
-    // vista se dejan intactas.
     { id: 'anomalias', label: 'Anomalias', path: '/anomalias', section: 'anomalias' },
+    { id: 'rutas', label: 'Rutas', path: '/rutas' },
     { id: 'Puntos_de_ruta', label: 'Puntos de Ruta', path: '/estado-ruta', section: 'estadoRuta' },
-    // Validación de Recolección: oculta del navbar por ahora (pendiente de
-    // implementar), pero la ruta y la vista se dejan intactas.
     { id: 'Administracion', label: 'Administración', path: '/administracion', section: 'administracion' },
   ];
 

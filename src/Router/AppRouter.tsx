@@ -11,6 +11,7 @@ import Dashboard from "../Pages/Dashboard/Dashboard";
 import Historial from "../Pages/Historial/Historial";
 import Anomalias from "../Pages/Anomalias/Anomalias";
 import EstadoRuta from "../Pages/EstadoRuta/EstadoRuta";
+import Rutas from "../Pages/Rutas/Rutas";
 
 // Páginas sin conectar todavía (ver src/Pages/_inactive/README.md)
 import Alertas from "../Pages/_inactive/Alertas/Alertas";
@@ -69,6 +70,7 @@ export default function AppRouter() {
           }
         >
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/rutas" element={<Rutas />} />
           <Route path="/historial" element={<Historial />} />
           <Route
             path="/alertas"
