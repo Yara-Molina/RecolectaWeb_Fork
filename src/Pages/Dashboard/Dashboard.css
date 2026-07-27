@@ -253,9 +253,9 @@
 
 /* ===== MAPA ===== */
 .mapa-wrap {
-  padding: 16px;
+  padding: 0;
   background: rgba(255, 255, 255, 0.6);
-  height: 320px;
+  height: 500px;
   border-radius: 10px;
 }
 
@@ -267,19 +267,18 @@
 }
 
 .card--mapa-expandido {
-  position: fixed;
-  top: 20px;
-  left: 20px;
-  right: 20px;
-  bottom: 20px;
-  z-index: 1000;
+  position: relative;
+  top: auto;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  z-index: auto;
   display: flex;
   flex-direction: column;
 }
 
 .mapa-wrap--expandido {
-  flex: 1;
-  height: auto;
+  height: 500px;
 }
 
 .mapa-ruta-acciones {
@@ -609,7 +608,7 @@
   }
 
   .mapa-wrap {
-    height: 240px;
+    height: 400px;
   }
 }
 

@@ -4,6 +4,7 @@ import MapaSuchiapa, { type CamionMapa } from './mapa/MapaSuchiapa';
 import { obtenerDireccionCompleta } from './mapa/geocodificacion';
 import { apiRequest, ApiError } from '../../services/api';
 import { ROLES } from '../../services/auth';
+import { useTrackingWS } from '../../hooks/useTrackingWS';
 import './Dashboard.css';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -193,10 +194,47 @@ export default function Dashboard() {
   const [conductores, setConductores] = useState<ConductorDashboard[]>([]);
 
   const [vaciados, setVaciados] = useState<RegistroVaciadoDashboard[]>([]);
+  const [rutasActivasMapa, setRutasActivasMapa] = useState<Array<{
+    ruta_id: number;
+    nombre: string;
+    conductor_id: number | null;
+    puntos: Array<[number, number]>;
+  }>>([]);
+
+  const { conductores: conductoresEnVivo, conectado: wsConectado } = useTrackingWS();
 
   useEffect(() => {
     const iv = setInterval(() => setAhora(new Date()), 1000);
     return () => clearInterval(iv);
+  }, []);
+
+  useEffect(() => {
+    async function cargarRutasActivasMapa() {
+      try {
+        const apiRutaUrl = import.meta.env.VITE_API_RUTA_URL || '';
+        if (!apiRutaUrl) return;
+        const res = await fetch(`${apiRutaUrl}/rutas/activas`);
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          const rutasData = json.data.map((r: {
+            ruta_id: number;
+            nombre: string;
+            conductor_id: number | null;
+            json_ruta: string | { puntos?: Array<{ lat: number; lng: number }> };
+          }) => {
+            const jsonRuta = typeof r.json_ruta === 'string' ? JSON.parse(r.json_ruta) : r.json_ruta;
+            const puntosArr = jsonRuta?.puntos || [];
+            const puntos: [number, number][] = puntosArr.map((p: { lat: number; lng: number }) => [p.lat, p.lng]);
+            return { ruta_id: r.ruta_id, nombre: r.nombre, conductor_id: r.conductor_id, puntos };
+          });
+          setRutasActivasMapa(rutasData);
+        }
+      } catch (e) {
+        console.error('Error cargando rutas activas para el mapa:', e);
+      }
+    }
+    void cargarRutasActivasMapa();
   }, []);
 
   useEffect(() => {
@@ -566,7 +604,12 @@ return (
         <div className="left-column">
           <div className={`card ${modoRuta ? 'card--mapa-expandido' : ''}`}>
             <div className="card-title card-title--flex">
-              <span>Mapa de rutas · Tiempo real</span>
+              <span>
+                Mapa de rutas · Tiempo real {wsConectado ? '🟢' : '🔴'}
+                {conductoresEnVivo.length > 0
+                  ? ` (${conductoresEnVivo.length} activo${conductoresEnVivo.length > 1 ? 's' : ''})`
+                  : ''}
+              </span>
               {!modoRuta ? (
                 <button className="pager-btn" onClick={activarModoRuta}>Poner ruta</button>
               ) : (
@@ -590,6 +633,8 @@ return (
             <div className={`mapa-wrap ${modoRuta ? 'mapa-wrap--expandido' : ''}`}>
               <MapaSuchiapa
                 camiones={camionesMapa}
+                conductoresEnVivo={conductoresEnVivo}
+                rutasActivas={rutasActivasMapa}
                 seleccionable={modoRuta}
                 puntos={puntosRuta.map(p => [p.lat, p.lng] as [number, number])}
                 onAgregarPunto={agregarPuntoRuta}
