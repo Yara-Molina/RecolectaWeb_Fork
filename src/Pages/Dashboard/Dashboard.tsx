@@ -174,7 +174,9 @@ export default function Dashboard() {
   const [modoRuta, setModoRuta] = useState(false);
   const [puntosRuta, setPuntosRuta] = useState<PuntoRuta[]>([]);
   const [nombreRutaNueva, setNombreRutaNueva] = useState('');
-  const [conductorSeleccionado] = useState<number | null>(12); // Francisco Castro ID 12 por defecto -- fijo por ahora, sin selector en UI
+
+  const [conductorSeleccionado, setConductorSeleccionado] = useState<number | null>(null);
+
   const [guardandoRuta, setGuardandoRuta] = useState(false);
   const [errorRuta, setErrorRuta] = useState<string | null>(null);
 
@@ -384,7 +386,9 @@ export default function Dashboard() {
     }
 
     if (!conductorSeleccionado) {
-      setErrorRuta('Cargando información del conductor, espera un momento...');
+
+      setErrorRuta('Selecciona un conductor antes de guardar la ruta.');
+
       return;
     }
 
@@ -406,6 +410,7 @@ export default function Dashboard() {
         lng: ultimoPunto.lng,
         nombre: 'Base Fin'
       };
+
 
       const conductorNombre = conductores.find(c => c.id === conductorSeleccionado)?.nombre || 'Francisco Castro';
 
@@ -702,4 +707,5 @@ return (
     </div>
   </div>
 );
+
 }
