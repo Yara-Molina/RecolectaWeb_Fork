@@ -358,6 +358,30 @@ font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   background: rgba(226, 75, 74, 0.08);
 }
 
+.emp-action.assign {
+  color: #1e4d37;
+  border-color: rgba(30, 77, 55, 0.18);
+  background: rgba(30, 77, 55, 0.08);
+}
+
+.emp-btn.danger {
+  color: #c23f3f;
+  border: 1px solid rgba(226, 75, 74, 0.25);
+  background: rgba(226, 75, 74, 0.08);
+}
+
+.emp-assign-intro {
+  margin: 0;
+  color: #5b6d63;
+  line-height: 1.5;
+}
+
+.emp-form-actions-split {
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .emp-form {
   display: flex;
   flex-direction: column;

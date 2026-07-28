@@ -1,7 +1,7 @@
 // Login.jsx o Login.tsx
 import { useState } from 'react';
 import './Login.css';
-import Logo from '../../Assets/Logo.png';
+import Logo from '../../assets/Logo.png';
 import { useNavigate } from 'react-router-dom';
 import { FiEye, FiEyeOff } from 'react-icons/fi';
 import { apiRequest, setToken, setRole, setUserName } from '../../services/api';

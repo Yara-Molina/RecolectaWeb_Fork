@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Fragment, useState, useEffect, useMemo, useRef } from 'react';
 import './Navbar.css';
-import Logo from '../../Assets/Logo.png';
+import Logo from '../../assets/Logo.png';
 import { clearSession, getUserName } from '../../services/api';
 import { canAccess, roleName, type SectionKey } from '../../services/auth';
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FiDownload, FiPlus, FiUsers, FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import EmpleadoForm from "./components/EmpleadoForm";
 import EmpleadosTable from "./components/EmpleadosTable";
+import AsignarCamionModal, { type CamionOption } from "./components/AsignarCamionModal";
 import "./EmpleadosPage.css";
 import { apiRequest } from "../../../services/api";
 import { ROLE_NAMES, type RoleId } from "../../../services/auth";
@@ -47,8 +48,50 @@ export default function EmpleadosPage() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleId | "todos">("todos");
   const [modal, setModal] = useState<{ modo: "CREAR" | "EDITAR"; empleado: Empleado | null } | null>(null);
+  const [asignacionModal, setAsignacionModal] = useState<Empleado | null>(null);
+  const [camiones, setCamiones] = useState<CamionOption[]>([]);
+  const [asignacionesActivas, setAsignacionesActivas] = useState<Map<number, number>>(new Map());
   const [saving, setSaving] = useState(false);
   const [pagina, setPagina] = useState(1);
+
+  async function loadCamiones() {
+    try {
+      const response = await apiRequest<{ data: CamionOption[] }>("/api/camion/");
+      setCamiones(response.data ?? []);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `No se pudieron cargar los camiones: ${err.message}`
+          : "No se pudieron cargar los camiones.",
+      );
+    }
+  }
+
+  async function loadAsignacionesActivas() {
+    try {
+      const response = await apiRequest<{ data: unknown[] }>("/api/historial-asignacion/");
+      const activas = new Map<number, number>();
+
+      for (const raw of response.data ?? []) {
+        const row = raw as Record<string, unknown>;
+        const idChofer = Number(row.id_chofer ?? 0);
+        const idCamion = Number(row.id_camion ?? 0);
+        const fechaBaja = typeof row.fecha_baja === "string" ? row.fecha_baja : "";
+
+        if (idChofer > 0 && idCamion > 0 && !fechaBaja) {
+          activas.set(idChofer, idCamion);
+        }
+      }
+
+      setAsignacionesActivas(activas);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `No se pudo cargar asignaciones chofer-camión: ${err.message}`
+          : "No se pudo cargar asignaciones chofer-camión.",
+      );
+    }
+  }
 
   async function loadEmpleados() {
     setLoading(true);
@@ -57,6 +100,7 @@ export default function EmpleadosPage() {
     try {
       const response = await apiRequest<{ data: unknown[] }>("/api/empleados/");
       setEmpleados(response.data.map(normalizarEmpleado));
+      await Promise.all([loadCamiones(), loadAsignacionesActivas()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudieron cargar los empleados.");
     } finally {
@@ -92,6 +136,68 @@ export default function EmpleadosPage() {
   const openCreate = () => setModal({ modo: "CREAR", empleado: null });
   const openEdit = (empleado: Empleado) => setModal({ modo: "EDITAR", empleado });
   const closeModal = () => setModal(null);
+  const openAsignarCamion = (empleado: Empleado) => setAsignacionModal(empleado);
+  const closeAsignacionModal = () => setAsignacionModal(null);
+
+  const camionPorConductor = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const [choferId, camionId] of asignacionesActivas) {
+      const camion = camiones.find((c) => c.camion_id === camionId);
+      map.set(choferId, camion?.placa ?? `Camión #${camionId}`);
+    }
+    return map;
+  }, [asignacionesActivas, camiones]);
+
+  const handleAsignarCamion = async (empleadoId: number, camionId: number) => {
+    setSaving(true);
+    setError(null);
+
+    try {
+      await apiRequest(`/api/historial-asignacion/cerrar/chofer/${empleadoId}`, {
+        method: "PUT",
+      }).catch(() => undefined);
+
+      await apiRequest(`/api/historial-asignacion/cerrar/camion/${camionId}`, {
+        method: "PUT",
+      }).catch(() => undefined);
+
+      await apiRequest("/api/historial-asignacion/", {
+        method: "POST",
+        body: JSON.stringify({
+          id_chofer: empleadoId,
+          id_camion: camionId,
+          fecha_asignacion: new Date().toISOString().slice(0, 10),
+        }),
+      });
+
+      closeAsignacionModal();
+      await loadAsignacionesActivas();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo asignar el camión.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDesasignarCamion = async (empleadoId: number) => {
+    const ok = confirm("¿Quitar la asignación de camión de este conductor?");
+    if (!ok) return;
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      await apiRequest(`/api/historial-asignacion/cerrar/chofer/${empleadoId}`, {
+        method: "PUT",
+      });
+      closeAsignacionModal();
+      await loadAsignacionesActivas();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo quitar la asignación.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleSave = async (values: EmpleadoFormValues) => {
     if (!modal) return;
@@ -230,7 +336,13 @@ export default function EmpleadosPage() {
           <div className="emp-loading">Cargando empleados...</div>
         ) : (
           <>
-            <EmpleadosTable data={empleadosPagina} onDelete={handleDelete} onEdit={openEdit} />
+            <EmpleadosTable
+              data={empleadosPagina}
+              camionPorConductor={camionPorConductor}
+              onDelete={handleDelete}
+              onEdit={openEdit}
+              onAsignarCamion={openAsignarCamion}
+            />
 
             {totalPaginas > 1 && (
               <div className="emp-pagination">
@@ -273,6 +385,23 @@ export default function EmpleadosPage() {
                 onCancel={closeModal}
                 onSave={handleSave}
                 saving={saving}
+              />
+            </div>
+          </div>
+        )}
+
+        {asignacionModal && (
+          <div className="emp-modal-overlay" onClick={closeAsignacionModal}>
+            <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
+              <h2>Asignar camión</h2>
+              <AsignarCamionModal
+                empleado={asignacionModal}
+                camiones={camiones}
+                camionActualId={asignacionesActivas.get(asignacionModal.id) ?? null}
+                saving={saving}
+                onCancel={closeAsignacionModal}
+                onSave={(camionId) => void handleAsignarCamion(asignacionModal.id, camionId)}
+                onDesasignar={() => void handleDesasignarCamion(asignacionModal.id)}
               />
             </div>
           </div>

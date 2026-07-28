@@ -76,7 +76,7 @@ export const SECTION_ROLES: Record<SectionKey, RoleId[]> = {
   // /api/empleados -> RequireRole(ADMIN) exclusivamente
   administracionEmpleados: [ROLES.ADMIN],
 
-  // /api/dispositivos/{pendientes,aprobar,desvincular} -> RequireRole(SUPERVISOR, ADMIN, COORDINADOR)
+  // /api/dispositivos/{pendientes,activos,aprobar,desvincular} -> RequireRole(SUPERVISOR, ADMIN, COORDINADOR)
   administracionDispositivos: [ROLES.ADMIN, ROLES.SUPERVISOR, ROLES.COORDINADOR],
 };
 
