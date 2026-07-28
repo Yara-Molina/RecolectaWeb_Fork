@@ -384,6 +384,7 @@ export default function Dashboard() {
     }
 
     if (!conductorSeleccionado) {
+
       setErrorRuta('Selecciona un conductor antes de guardar la ruta.');
       return;
     }
@@ -407,7 +408,7 @@ export default function Dashboard() {
         nombre: 'Base Fin'
       };
 
-      const conductorNombre = conductores.find(c => c.id === conductorSeleccionado)?.nombre || 'Sin asignar';
+      const conductorNombre = conductores.find(c => c.id === conductorSeleccionado)?.nombre || 'Francisco Castro';
 
       // Construir array completo de puntos con toda la info (lat, lng, direccion, calle...)
       const puntosCompletos = puntosRuta.map((p, i) => {
@@ -712,4 +713,6 @@ return (
     </div>
   </div>
 );
+
 }
+
