@@ -7,8 +7,6 @@ import { apiRequest, ApiError } from '../../services/api';
 import { ROLES } from '../../services/auth';
 import './Dashboard.css';
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-// Tal como responde GET /api/anomalias/ (ver Pages/Anomalias/Anomalias.tsx)
 type EstadoAnomalia = 'PENDIENTE' | 'EN_PROCESO' | 'RESUELTA';
 
 interface Anomalia {
@@ -696,7 +694,7 @@ return (
                       <p className="alerta-detalle">{a.descripcion}</p>
                       {a.punto_id && (
                         <p className="alerta-detalle" style={{ marginTop: '6px', fontWeight: 600 }}>
-                          📍 Punto de recolección: {a.punto_id}
+                         Punto de recolección: {a.punto_id}
                         </p>
                       )}
                     </div>
