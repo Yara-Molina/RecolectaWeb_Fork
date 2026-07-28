@@ -47,7 +47,7 @@ export default function EmpleadosTable({
             <tr key={empleado.id}>
               <td>
                 <b>{empleado.nombre}</b>
-                <div className="emp-subtext">ID: EMP-{String(empleado.id).padStart(3, "0")}</div>
+                <div className="emp-subtext">ID: {empleado.id}</div>
               </td>
               <td>{empleado.email}</td>
               <td>
