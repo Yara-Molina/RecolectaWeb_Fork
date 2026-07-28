@@ -1,0 +1,87 @@
+.rutas-page {
+  padding: 20px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.rutas-header h1 {
+  margin: 0;
+  font-size: 22px;
+  color: #0F676C;
+}
+
+.rutas-header p {
+  margin: 4px 0 20px;
+  color: #5a6e60;
+  font-size: 14px;
+}
+
+.rutas-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ruta-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 103, 108, 0.1);
+  box-shadow: 0 2px 6px rgba(15, 103, 108, 0.06);
+}
+
+.ruta-item-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ruta-nombre {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1a3a2f;
+}
+
+.ruta-desc {
+  font-size: 12px;
+  color: #5a6e60;
+}
+
+.ruta-item-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ruta-puntos {
+  font-size: 12px;
+  color: #5a6e60;
+  background: rgba(15, 103, 108, 0.08);
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.ruta-btn-eliminar {
+  background: none;
+  border: none;
+  color: #E24B4A;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.ruta-btn-eliminar:hover {
+  background: rgba(226, 75, 74, 0.1);
+}
+
+.rutas-empty {
+  text-align: center;
+  color: #5a6e60;
+  padding: 40px 0;
+  font-size: 14px;
+}

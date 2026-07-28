@@ -1,8 +1,8 @@
 import type { Coordenada } from './geo';
 
-export const SUCHIAPA_CENTER: Coordenada = [16.75, -93.1];
+export const SUCHIAPA_CENTER: Coordenada = [16.73, -93.12];
 
 export const SUCHIAPA_BOUNDS: [Coordenada, Coordenada] = [
-  [16.58, -93.22],
-  [16.80, -93.02],
+  [16.55, -93.25],
+  [16.82, -92.95],
 ];
