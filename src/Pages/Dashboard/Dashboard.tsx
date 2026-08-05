@@ -470,71 +470,68 @@ export default function Dashboard() {
       console.log('Asignada a:', conductorNombre, '(ID:', conductorSeleccionado, ')');
       console.log('Puntos completos:', JSON.stringify(puntosCompletos, null, 2));
 
-      // 1. Crear la ruta con conductor asignado y TODOS los puntos en json_ruta
-      const rutaResponse = await apiRequest<{ success: boolean; data: { ruta_id: number } }>('/api/rutas/', {
-        method: 'POST',
-        body: JSON.stringify({
-          nombre: nombreRutaNueva.trim(),
-          descripcion: `Ruta creada desde el dashboard con ${puntosRuta.length} puntos. Asignada a ${conductorNombre}.`,
-          conductor_id: conductorSeleccionado,
-          json_ruta: {
-            type: 'LineString',
-            coordinates: puntosRuta.map(p => [p.lng, p.lat]),
-            puntos: puntosCompletos, // Todos los puntos con lat, lng, direccion
-            base_inicio: baseInicio,
-            base_fin: baseFin
-          },
-        }),
-      });
-
-      console.log('Ruta creada:', rutaResponse);
-      const rutaId = rutaResponse.data.ruta_id;
-
-      // 2. Crear puntos de recolección (contrato gin-backend: cp, lat, lon, ruta_id)
-      console.log('Creando puntos de recolección para ruta', rutaId);
-      for (let i = 0; i < puntosRuta.length; i++) {
-        const punto = puntosRuta[i];
-        const dir = punto.direccionCompleta;
-        const cp =
-          (dir?.cp || punto.direccion || `Punto ${i + 1}`).trim() ||
-          `${punto.lat},${punto.lng}`;
-
-        await apiRequest('/api/puntos-recoleccion/', {
-          method: 'POST',
-          body: JSON.stringify({
-            cp,
-            lat: punto.lat,
-            lon: punto.lng,
-            ruta_id: rutaId,
-            punto_id: 0,
-          }),
-        });
+      // api-rutas (Node): fuente real de rutas para web/app. No usar /api/rutas de Gin.
+      const apiRutaUrl = (import.meta.env.VITE_API_RUTA_URL || '').replace(/\/$/, '');
+      if (!apiRutaUrl) {
+        throw new Error('VITE_API_RUTA_URL no está configurada (ej. https://api-rutas.practicasoftware.fun)');
       }
 
-      console.log('Ruta y puntos guardados exitosamente');
+      const payload = {
+        nombre: nombreRutaNueva.trim(),
+        descripcion: `Ruta creada desde el dashboard con ${puntosRuta.length} puntos. Asignada a ${conductorNombre}.`,
+        conductor_id: conductorSeleccionado,
+        json_ruta: {
+          type: 'LineString',
+          coordinates: puntosRuta.map(p => [p.lng, p.lat]),
+          puntos: puntosCompletos,
+          base_inicio: baseInicio,
+          base_fin: baseFin,
+        },
+      };
 
-      // 3. Optimizar la ruta con el AG (algoritmo genético)
-      console.log('Optimizando ruta con AG...');
+      // 1. Crear la ruta en api-rutas
+      const createRes = await fetch(`${apiRutaUrl}/rutas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const createJson = await createRes.json().catch(() => ({}));
+      if (!createRes.ok) {
+        throw new Error(createJson?.message || createJson?.error || `Error al crear ruta (${createRes.status})`);
+      }
+
+      const rutaId = createJson?.data?.ruta_id ?? createJson?.ruta_id;
+      console.log('Ruta creada en api-rutas:', createJson);
+
+      // 2. Optimizar vía api-rutas (este servicio llama al AG)
+      console.log('Optimizando ruta con AG vía api-rutas...');
       try {
-        const optimizacion = await apiRequest<{ success: boolean; message: string; data: any }>(`/api/rutas/${rutaId}/optimizar`, {
+        const optRes = await fetch(`${apiRutaUrl}/rutas/${rutaId}/optimizar`, {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
         });
-        console.log('Ruta optimizada por AG:', optimizacion);
+        const optimizacion = await optRes.json().catch(() => ({}));
+        console.log('Ruta optimizada:', optimizacion);
 
-        if (optimizacion.success) {
-          alert(`✓ Ruta "${nombreRutaNueva}" guardada y OPTIMIZADA con ${puntosRuta.length} puntos\n\nAsignada a: ${conductorNombre}\nDistancia: ${optimizacion.data?.distancia_total_km || 'N/A'} km\nBase inicio: Laredo Texas\nBase fin: ${ultimoPunto.direccion}`);
+        if (optRes.ok && optimizacion.success !== false) {
+          const distancia =
+            optimizacion.data?.distancia_total_km ??
+            optimizacion.distancia_total_km ??
+            optimizacion.data?.distancia_total ??
+            'N/A';
+          alert(`✓ Ruta "${nombreRutaNueva}" guardada y OPTIMIZADA con ${puntosRuta.length} puntos\n\nAsignada a: ${conductorNombre}\nDistancia: ${distancia} km\nBase inicio: Laredo Texas\nBase fin: ${ultimoPunto.direccion}`);
         } else {
           alert(`✓ Ruta "${nombreRutaNueva}" guardada con ${puntosRuta.length} puntos\n\n⚠ No se pudo optimizar (AG no disponible)\nAsignada a: ${conductorNombre}`);
         }
       } catch (optErr) {
         console.warn('No se pudo optimizar con AG:', optErr);
-        alert(`✓ Ruta "${nombreRutaNueva}" guardada con ${puntosRuta.length} puntos\n\n⚠ No se optimizó (AG no disponible, revisa que esté corriendo en puerto 8003)\nAsignada a: ${conductorNombre}`);
+        alert(`✓ Ruta "${nombreRutaNueva}" guardada con ${puntosRuta.length} puntos\n\n⚠ No se optimizó (AG no disponible)\nAsignada a: ${conductorNombre}`);
       }
 
       cancelarModoRuta();
     } catch (err) {
       console.error('Error guardando ruta:', err);
-      setErrorRuta(err instanceof ApiError ? err.message : 'No se pudo guardar la ruta.');
+      setErrorRuta(err instanceof ApiError ? err.message : (err instanceof Error ? err.message : 'No se pudo guardar la ruta.'));
     } finally {
       setGuardandoRuta(false);
     }
