@@ -476,10 +476,14 @@ export default function Dashboard() {
 
       // conductor_id va DENTRO de json_ruta: Gin no tiene columna propia y
       // GetActivas lo lee de ahí si no hay asignación camión/chofer.
+      // La app móvil dibuja con ruta_optimizada_coords ([lat,lng]) o coordinates.
+      // Aunque el AG falle, dejamos geometría mínima a partir de los puntos.
+      const coordsDesdePuntos: Array<[number, number]> = puntosRuta.map(p => [p.lat, p.lng]);
       const jsonRutaBase = {
         type: 'LineString' as const,
         conductor_id: conductorSeleccionado,
         coordinates: puntosRuta.map(p => [p.lng, p.lat]),
+        ruta_optimizada_coords: coordsDesdePuntos,
         puntos: puntosCompletos,
         base_inicio: baseInicio,
         base_fin: baseFin,
@@ -617,6 +621,22 @@ export default function Dashboard() {
         alert(`✓ Ruta "${nombreRutaNueva}" guardada y OPTIMIZADA con ${puntosRuta.length} puntos\n\nAsignada a: ${conductorNombre} (ID ${conductorSeleccionado})\nDistancia: ${distancia} km`);
       } catch (optErr) {
         console.warn('No se pudo optimizar con AG:', optErr);
+        // Aun sin AG, asegurar geometría dibujable en Gin para el mapa móvil.
+        try {
+          await apiRequest(`/api/rutas/${ginRutaId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              nombre: nombreRutaNueva.trim(),
+              descripcion,
+              json_ruta: {
+                ...jsonRutaBase,
+                optimizada: false,
+              },
+            }),
+          });
+        } catch (e) {
+          console.warn('No se pudo persistir geometría fallback en Gin:', e);
+        }
         alert(`✓ Ruta "${nombreRutaNueva}" guardada con ${puntosRuta.length} puntos\n\n⚠ No se optimizó: ${optErr instanceof Error ? optErr.message : 'AG no disponible'}\nAsignada a: ${conductorNombre} (ID ${conductorSeleccionado})`);
       }
 
