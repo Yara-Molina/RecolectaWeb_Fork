@@ -20,7 +20,7 @@ export default function Rutas() {
   const cargarRutas = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${apiUrl}/rutas/activas`);
+      const res = await fetch(`${apiUrl}/rutas`);
       if (!res.ok) return;
       const json = await res.json();
       if (Array.isArray(json)) {

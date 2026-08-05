@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  FiCheckCircle,
   FiChevronLeft,
   FiChevronRight,
-  FiLink,
   FiRefreshCw,
   FiSmartphone,
 } from "react-icons/fi";
@@ -10,7 +10,9 @@ import DispositivosTable from "./components/DispositivosTable";
 import "./DispositivosPage.css";
 import { apiRequest, ApiError } from "../../../services/api";
 
-export interface DispositivoPendiente {
+export type DispositivoVista = "pendientes" | "vinculados";
+
+export interface DispositivoItem {
   id: number;
   conductor_id: number;
   conductor_nombre: string;
@@ -24,6 +26,9 @@ export interface DispositivoPendiente {
   created_at: string;
 }
 
+/** @deprecated Prefer DispositivoItem */
+export type DispositivoPendiente = DispositivoItem;
+
 const ITEMS_POR_PAGINA = 10;
 
 function mensajeError(err: unknown, fallback: string): string {
@@ -35,7 +40,7 @@ function mensajeError(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
 }
 
-function normalizarDispositivo(raw: unknown): DispositivoPendiente {
+function normalizarDispositivo(raw: unknown): DispositivoItem {
   const s = raw as Record<string, unknown>;
   return {
     id: Number(s.id ?? 0),
@@ -53,39 +58,39 @@ function normalizarDispositivo(raw: unknown): DispositivoPendiente {
 }
 
 export default function DispositivosPage() {
-  const [dispositivos, setDispositivos] = useState<DispositivoPendiente[]>([]);
+  const [vista, setVista] = useState<DispositivoVista>("pendientes");
+  const [pendientes, setPendientes] = useState<DispositivoItem[]>([]);
+  const [vinculados, setVinculados] = useState<DispositivoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [pagina, setPagina] = useState(1);
   const [actingId, setActingId] = useState<number | null>(null);
-  const [desvincularId, setDesvincularId] = useState("");
-  const [desvinculandoManual, setDesvinculandoManual] = useState(false);
 
-  async function loadPendientes() {
+  const loadListas = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await apiRequest<{ data: unknown[] }>("/api/dispositivos/pendientes");
-      setDispositivos((response.data ?? []).map(normalizarDispositivo));
+      const [respPendientes, respActivos] = await Promise.all([
+        apiRequest<{ data: unknown[] }>("/api/dispositivos/pendientes"),
+        apiRequest<{ data: unknown[] }>("/api/dispositivos/activos"),
+      ]);
+      setPendientes((respPendientes.data ?? []).map(normalizarDispositivo));
+      setVinculados((respActivos.data ?? []).map(normalizarDispositivo));
     } catch (err) {
-      if (err instanceof ApiError && err.status === 404) {
-        // El endpoint no existe en el backend, mostrar array vacío
-        setDispositivos([]);
-        setError(null);
-      } else {
-        setError(mensajeError(err, "No se pudieron cargar las solicitudes de vinculación."));
-      }
+      setError(mensajeError(err, "No se pudieron cargar los dispositivos."));
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
-    void loadPendientes();
-  }, []);
+    void loadListas();
+  }, [loadListas]);
+
+  const dispositivos = vista === "pendientes" ? pendientes : vinculados;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -113,9 +118,9 @@ export default function DispositivosPage() {
 
   useEffect(() => {
     setPagina(1);
-  }, [search]);
+  }, [search, vista]);
 
-  const handleAprobar = async (dispositivo: DispositivoPendiente) => {
+  const handleAprobar = async (dispositivo: DispositivoItem) => {
     const nombre = `${dispositivo.conductor_nombre} ${dispositivo.conductor_apellido}`.trim();
     const ok = confirm(
       `¿Aprobar el dispositivo de ${nombre || `conductor #${dispositivo.conductor_id}`}?\n\n` +
@@ -132,7 +137,7 @@ export default function DispositivosPage() {
         method: "PUT",
       });
       setSuccess("Dispositivo aprobado y activado correctamente.");
-      await loadPendientes();
+      await loadListas();
     } catch (err) {
       setError(mensajeError(err, "No se pudo aprobar el dispositivo."));
     } finally {
@@ -140,11 +145,11 @@ export default function DispositivosPage() {
     }
   };
 
-  const handleDesvincular = async (dispositivo: DispositivoPendiente) => {
+  const handleDesvincular = async (dispositivo: DispositivoItem) => {
     const nombre = `${dispositivo.conductor_nombre} ${dispositivo.conductor_apellido}`.trim();
     const ok = confirm(
       `¿Desvincular el dispositivo de ${nombre || `conductor #${dispositivo.conductor_id}`}?\n\n` +
-        "El conductor podrá solicitar otra vinculación después.",
+        "El conductor podrá solicitar otra vinculación después. Útil si el equipo se perdió o fue robado.",
     );
     if (!ok) return;
 
@@ -157,43 +162,11 @@ export default function DispositivosPage() {
         method: "DELETE",
       });
       setSuccess("Dispositivo desvinculado correctamente.");
-      await loadPendientes();
+      await loadListas();
     } catch (err) {
       setError(mensajeError(err, "No se pudo desvincular el dispositivo."));
     } finally {
       setActingId(null);
-    }
-  };
-
-  const handleDesvincularManual = async (event: FormEvent) => {
-    event.preventDefault();
-    const conductorId = Number(desvincularId.trim());
-    if (!Number.isFinite(conductorId) || conductorId <= 0) {
-      setError("Ingresa un ID de conductor válido.");
-      return;
-    }
-
-    const ok = confirm(
-      `¿Desvincular el dispositivo del conductor #${conductorId}?\n\n` +
-        "Útil para dar de baja un equipo ya aprobado que ya no aparece en pendientes.",
-    );
-    if (!ok) return;
-
-    setDesvinculandoManual(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      await apiRequest(`/api/dispositivos/desvincular/${conductorId}`, {
-        method: "DELETE",
-      });
-      setSuccess(`Dispositivo del conductor #${conductorId} desvinculado correctamente.`);
-      setDesvincularId("");
-      await loadPendientes();
-    } catch (err) {
-      setError(mensajeError(err, "No se pudo desvincular el dispositivo."));
-    } finally {
-      setDesvinculandoManual(false);
     }
   };
 
@@ -204,22 +177,56 @@ export default function DispositivosPage() {
           <div>
             <h1>Dispositivos</h1>
             <p>
-              Revisa solicitudes de vinculación de conductores, aprueba equipos o
-              desvincula dispositivos autorizados.
+              Revisa solicitudes de vinculación, aprueba equipos o desvincula
+              dispositivos autorizados (pérdida o robo).
             </p>
           </div>
 
           <div className="disp-cards">
-            <div className="disp-card">
+            <button
+              type="button"
+              className={`disp-card${vista === "pendientes" ? " active" : ""}`}
+              onClick={() => setVista("pendientes")}
+            >
               <div className="disp-card-icon">
                 <FiSmartphone />
               </div>
               <div>
-                <h3>{dispositivos.length}</h3>
+                <h3>{pendientes.length}</h3>
                 <span>Pendientes</span>
               </div>
-            </div>
+            </button>
+            <button
+              type="button"
+              className={`disp-card${vista === "vinculados" ? " active" : ""}`}
+              onClick={() => setVista("vinculados")}
+            >
+              <div className="disp-card-icon">
+                <FiCheckCircle />
+              </div>
+              <div>
+                <h3>{vinculados.length}</h3>
+                <span>Vinculados</span>
+              </div>
+            </button>
           </div>
+        </section>
+
+        <section className="disp-tabs" aria-label="Vista de dispositivos">
+          <button
+            type="button"
+            className={`disp-tab${vista === "pendientes" ? " active" : ""}`}
+            onClick={() => setVista("pendientes")}
+          >
+            Pendientes
+          </button>
+          <button
+            type="button"
+            className={`disp-tab${vista === "vinculados" ? " active" : ""}`}
+            onClick={() => setVista("vinculados")}
+          >
+            Vinculados
+          </button>
         </section>
 
         <section className="disp-toolbar">
@@ -227,14 +234,14 @@ export default function DispositivosPage() {
             className="disp-search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por conductor, MAC, serie o dispositivo..."
+            placeholder="Buscar por conductor, ID, MAC, serie o dispositivo..."
           />
 
           <div className="disp-toolbar-actions">
             <button
               type="button"
               className="disp-btn secondary"
-              onClick={() => void loadPendientes()}
+              onClick={() => void loadListas()}
               disabled={loading || actingId !== null}
             >
               <FiRefreshCw /> Actualizar
@@ -242,46 +249,16 @@ export default function DispositivosPage() {
           </div>
         </section>
 
-        <section className="disp-manual">
-          <div className="disp-manual-copy">
-            <FiLink />
-            <div>
-              <strong>Desvincular por conductor</strong>
-              <p>
-                El listado solo muestra solicitudes pendientes. Usa esto para dar de baja
-                un dispositivo ya aprobado.
-              </p>
-            </div>
-          </div>
-
-          <form className="disp-manual-form" onSubmit={(e) => void handleDesvincularManual(e)}>
-            <input
-              className="disp-manual-input"
-              value={desvincularId}
-              onChange={(e) => setDesvincularId(e.target.value)}
-              placeholder="ID del conductor"
-              inputMode="numeric"
-              disabled={desvinculandoManual}
-            />
-            <button
-              type="submit"
-              className="disp-btn danger"
-              disabled={desvinculandoManual || !desvincularId.trim()}
-            >
-              Desvincular
-            </button>
-          </form>
-        </section>
-
         {error && <div className="disp-alert">{error}</div>}
         {success && <div className="disp-success">{success}</div>}
 
         {loading ? (
-          <div className="disp-loading">Cargando solicitudes...</div>
+          <div className="disp-loading">Cargando dispositivos...</div>
         ) : (
           <>
             <DispositivosTable
               data={paginaItems}
+              vista={vista}
               actingId={actingId}
               onAprobar={handleAprobar}
               onDesvincular={handleDesvincular}

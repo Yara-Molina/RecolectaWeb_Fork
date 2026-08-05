@@ -90,13 +90,20 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     try {
       const payload = (await response.json()) as {
         message?: string;
-        error?: string | { message?: string };
+        error?: string | { message?: string; details?: { error?: string } | string };
       };
 
       if (typeof payload.error === "string") {
         message = payload.error;
       } else {
-        message = payload.error?.message ?? payload.message ?? message;
+        const details = payload.error?.details;
+        const detailText =
+          typeof details === "string"
+            ? details
+            : typeof details === "object" && details?.error
+              ? details.error
+              : undefined;
+        message = detailText ?? payload.error?.message ?? payload.message ?? message;
       }
     } catch {
 
