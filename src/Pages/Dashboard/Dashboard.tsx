@@ -490,35 +490,23 @@ export default function Dashboard() {
       console.log('Ruta creada:', rutaResponse);
       const rutaId = rutaResponse.data.ruta_id;
 
-      // 2. Crear los puntos de recolección con toda la información
+      // 2. Crear puntos de recolección (contrato gin-backend: cp, lat, lon, ruta_id)
       console.log('Creando puntos de recolección para ruta', rutaId);
       for (let i = 0; i < puntosRuta.length; i++) {
         const punto = puntosRuta[i];
-        const esBaseInicio = i === 0;
-        const esBaseFin = i === puntosRuta.length - 1;
-
-        let nombrePunto = punto.direccion || `Punto ${i + 1}`;
-        if (esBaseInicio) nombrePunto = 'BASE INICIO: ' + nombrePunto;
-        if (esBaseFin) nombrePunto = 'BASE FIN: ' + nombrePunto;
-
         const dir = punto.direccionCompleta;
+        const cp =
+          (dir?.cp || punto.direccion || `Punto ${i + 1}`).trim() ||
+          `${punto.lat},${punto.lng}`;
 
         await apiRequest('/api/puntos-recoleccion/', {
           method: 'POST',
           body: JSON.stringify({
-            ruta_id: rutaId,
-            orden: i + 1,
-            nombre: nombrePunto,
-            direccion: punto.direccion,
+            cp,
             lat: punto.lat,
-            lon: punto.lng, // La BD usa 'lon', no 'lng'
-            calle: dir?.calle || null,
-            colonia: dir?.colonia || null,
-            municipio: dir?.municipio || null,
-            estado: dir?.estado || null,
-            cp: dir?.cp || null,
-            es_inicio: esBaseInicio,
-            es_fin: esBaseFin,
+            lon: punto.lng,
+            ruta_id: rutaId,
+            punto_id: 0,
           }),
         });
       }
