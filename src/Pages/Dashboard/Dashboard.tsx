@@ -504,29 +504,68 @@ export default function Dashboard() {
       const rutaId = createJson?.data?.ruta_id ?? createJson?.ruta_id;
       console.log('Ruta creada en api-rutas:', createJson, 'conductor_id:', conductorSeleccionado);
 
-      // 2. Optimizar vía api-rutas (este servicio llama al AG)
-      console.log('Optimizando ruta con AG vía api-rutas...');
+      // 2. Optimizar directo contra el AG (api-rutas NO expone /rutas/:id/optimizar).
+      const agUrl = (import.meta.env.VITE_AG_API_URL || 'https://ag.practicasoftware.fun').replace(/\/$/, '');
+      console.log('Optimizando ruta con AG:', agUrl);
       try {
-        const optRes = await fetch(`${apiRutaUrl}/rutas/${rutaId}/optimizar`, {
+        const agPayload = {
+          puntos: puntosCompletos.map((p) => ({
+            id: String(p.id),
+            lat: p.lat,
+            lng: p.lng,
+            nombre: p.nombre,
+          })),
+          base_inicio: baseInicio,
+          base_fin: baseFin,
+          bloqueos: [] as Array<{ id?: string; lat: number; lng: number; reporte?: string }>,
+          radio_bloqueo: 25.0,
+        };
+
+        const optRes = await fetch(`${agUrl}/optimizar`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(agPayload),
         });
         const optimizacion = await optRes.json().catch(() => ({}));
-        console.log('Ruta optimizada:', optimizacion);
+        console.log('Respuesta AG:', optRes.status, optimizacion);
 
-        if (optRes.ok && optimizacion.success !== false) {
-          const distancia =
-            optimizacion.data?.distancia_total_km ??
-            optimizacion.distancia_total_km ??
-            optimizacion.data?.distancia_total ??
-            'N/A';
-          alert(`✓ Ruta "${nombreRutaNueva}" guardada y OPTIMIZADA con ${puntosRuta.length} puntos\n\nAsignada a: ${conductorNombre} (ID ${conductorSeleccionado})\nDistancia: ${distancia} km`);
-        } else {
-          alert(`✓ Ruta "${nombreRutaNueva}" guardada con ${puntosRuta.length} puntos\n\n⚠ No se pudo optimizar (AG no disponible)\nAsignada a: ${conductorNombre} (ID ${conductorSeleccionado})`);
+        if (!optRes.ok) {
+          throw new Error(optimizacion?.detail || optimizacion?.message || `AG respondió ${optRes.status}`);
         }
+
+        const distancia = optimizacion.distancia_total_km ?? 'N/A';
+        const coordsOpt: Array<[number, number]> = Array.isArray(optimizacion.todas_las_coords)
+          ? optimizacion.todas_las_coords
+          : [];
+
+        // Persistir geometría optimizada en api-rutas para que la app móvil la vea.
+        const jsonOptimizado = {
+          ...payload.json_ruta,
+          optimizada: true,
+          distancia_total_km: optimizacion.distancia_total_km,
+          ruta_optimizada_coords: coordsOpt,
+          // GeoJSON LineString usa [lng, lat]
+          coordinates: coordsOpt.map(([lat, lng]) => [lng, lat]),
+          segmentos: optimizacion.segmentos ?? [],
+        };
+
+        const updateRes = await fetch(`${apiRutaUrl}/rutas/${rutaId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...payload,
+            json_ruta: jsonOptimizado,
+            distancia_total: optimizacion.distancia_total_km,
+          }),
+        });
+        if (!updateRes.ok) {
+          console.warn('AG OK pero no se pudo guardar la geometría en api-rutas:', updateRes.status);
+        }
+
+        alert(`✓ Ruta "${nombreRutaNueva}" guardada y OPTIMIZADA con ${puntosRuta.length} puntos\n\nAsignada a: ${conductorNombre} (ID ${conductorSeleccionado})\nDistancia: ${distancia} km`);
       } catch (optErr) {
         console.warn('No se pudo optimizar con AG:', optErr);
-        alert(`✓ Ruta "${nombreRutaNueva}" guardada con ${puntosRuta.length} puntos\n\n⚠ No se optimizó (AG no disponible)\nAsignada a: ${conductorNombre} (ID ${conductorSeleccionado})`);
+        alert(`✓ Ruta "${nombreRutaNueva}" guardada con ${puntosRuta.length} puntos\n\n⚠ No se optimizó: ${optErr instanceof Error ? optErr.message : 'AG no disponible'}\nAsignada a: ${conductorNombre} (ID ${conductorSeleccionado})`);
       }
 
       cancelarModoRuta();
