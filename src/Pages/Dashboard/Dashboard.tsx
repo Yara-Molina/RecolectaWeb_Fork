@@ -471,7 +471,7 @@ export default function Dashboard() {
       console.log('Puntos completos:', JSON.stringify(puntosCompletos, null, 2));
 
       // 1. Crear la ruta con conductor asignado y TODOS los puntos en json_ruta
-      const rutaResponse = await apiRequest<{ success: boolean; data: { ruta_id: number } }>('/rutas/', {
+      const rutaResponse = await apiRequest<{ success: boolean; data: { ruta_id: number } }>('/api/rutas/', {
         method: 'POST',
         body: JSON.stringify({
           nombre: nombreRutaNueva.trim(),
@@ -503,7 +503,7 @@ export default function Dashboard() {
 
         const dir = punto.direccionCompleta;
 
-        await apiRequest('/puntos-recoleccion/', {
+        await apiRequest('/api/puntos-recoleccion/', {
           method: 'POST',
           body: JSON.stringify({
             ruta_id: rutaId,

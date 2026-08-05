@@ -86,8 +86,8 @@ export default function EstadoRuta() {
 
     try {
       const [rutasRes, puntosRes] = await Promise.all([
-        apiRequest<{ success: boolean; data: Ruta[] }>('/rutas/'),
-        apiRequest<{ data: PuntoRecoleccion[] }>('/puntos-recoleccion/'),
+        apiRequest<{ success: boolean; data: Ruta[] }>('/api/rutas/'),
+        apiRequest<{ data: PuntoRecoleccion[] }>('/api/puntos-recoleccion/'),
       ]);
 
       setRutas(rutasRes.data ?? []);
@@ -155,7 +155,7 @@ export default function EstadoRuta() {
     setError(null);
 
     try {
-      await apiRequest(`/puntos-recoleccion/${id}`, { method: 'DELETE' });
+      await apiRequest(`/api/puntos-recoleccion/${id}`, { method: 'DELETE' });
       await loadAll();
     } catch (err) {
       setError(mensajeError(err, 'No se pudo eliminar el punto.'));
@@ -189,12 +189,12 @@ export default function EstadoRuta() {
 
     try {
       if (isEditing && editingId) {
-        await apiRequest(`/puntos-recoleccion/${editingId}`, {
+        await apiRequest(`/api/puntos-recoleccion/${editingId}`, {
           method: 'PUT',
           body: JSON.stringify(payload),
         });
       } else {
-        await apiRequest('/puntos-recoleccion/', {
+        await apiRequest('/api/puntos-recoleccion/', {
           method: 'POST',
           body: JSON.stringify(payload),
         });
