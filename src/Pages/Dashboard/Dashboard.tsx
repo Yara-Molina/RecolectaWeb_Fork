@@ -516,7 +516,7 @@ export default function Dashboard() {
       // 3. Optimizar la ruta con el AG (algoritmo genético)
       console.log('Optimizando ruta con AG...');
       try {
-        const optimizacion = await apiRequest<{ success: boolean; message: string; data: any }>(`/optimizar/ruta/${rutaId}`, {
+        const optimizacion = await apiRequest<{ success: boolean; message: string; data: any }>(`/api/rutas/${rutaId}/optimizar`, {
           method: 'POST',
         });
         console.log('Ruta optimizada por AG:', optimizacion);
