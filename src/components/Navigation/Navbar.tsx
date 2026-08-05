@@ -53,6 +53,7 @@ export default function Navbar() {
     { id: 'historial', label: 'Historial', path: '/historial', section: 'historial' },
     { id: 'anomalias', label: 'Anomalias', path: '/anomalias', section: 'anomalias' },
     { id: 'rutas', label: 'Rutas', path: '/rutas' },
+    { id: 'Puntos_de_ruta', label: 'Puntos de Ruta', path: '/estado-ruta', section: 'estadoRuta' },
     { id: 'Administracion', label: 'Administración', path: '/administracion', section: 'administracion' },
   ];
 

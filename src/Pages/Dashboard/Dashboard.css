@@ -278,7 +278,7 @@
 }
 
 .mapa-wrap--expandido {
-  height: 500px;
+  height: 650px;
 }
 
 .mapa-ruta-acciones {
@@ -706,4 +706,35 @@
 .mapa-ruta-coords {
   color: var(--text-light);
   font-size: 11px;
+}
+
+.rutas-lista {
+  padding: 12px 16px;
+}
+
+.ruta-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  border-bottom: 1px solid rgba(15, 103, 108, 0.1);
+}
+
+.ruta-item:last-child {
+  border-bottom: none;
+}
+
+.ruta-item-nombre {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+  flex: 1;
+}
+
+.ruta-item-info {
+  font-size: 12px;
+  color: var(--text-light);
+  background: var(--primary-soft);
+  padding: 4px 10px;
+  border-radius: 12px;
 }

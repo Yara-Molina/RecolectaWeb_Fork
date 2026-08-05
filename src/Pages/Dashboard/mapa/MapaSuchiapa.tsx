@@ -100,9 +100,9 @@ export default function MapaSuchiapa({
   return (
     <MapContainer
       center={SUCHIAPA_CENTER}
-      zoom={13}
+      zoom={15}
       minZoom={12}
-      maxZoom={18}
+      maxZoom={19}
       maxBounds={SUCHIAPA_BOUNDS as [number, number][]}
       maxBoundsViscosity={1.0}
       style={{ height: '100%', width: '100%' }}
