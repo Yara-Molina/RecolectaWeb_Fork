@@ -470,41 +470,82 @@ export default function Dashboard() {
       console.log('Asignada a:', conductorNombre, '(ID:', conductorSeleccionado, ')');
       console.log('Puntos completos:', JSON.stringify(puntosCompletos, null, 2));
 
-      // La app móvil lee de api-rutas (VITE_API_RUTA_URL), no de Gin /api/rutas/.
-      // Gin ignora conductor_id al crear; api-rutas sí lo persiste y lo usa la app.
+      // La app móvil llama a Gin: GET /api/rutas/activas?conductor_id=...
+      // (vía ngrok). También escribimos en api-rutas para la web/listado.
       const apiRutaUrl = (import.meta.env.VITE_API_RUTA_URL || '').replace(/\/$/, '');
-      if (!apiRutaUrl) {
-        throw new Error('VITE_API_RUTA_URL no está configurada (ej. https://api-rutas.practicasoftware.fun)');
-      }
 
-      const payload = {
-        nombre: nombreRutaNueva.trim(),
-        descripcion: `Ruta creada desde el dashboard con ${puntosRuta.length} puntos. Asignada a ${conductorNombre}.`,
+      // conductor_id va DENTRO de json_ruta: Gin no tiene columna propia y
+      // GetActivas lo lee de ahí si no hay asignación camión/chofer.
+      const jsonRutaBase = {
+        type: 'LineString' as const,
         conductor_id: conductorSeleccionado,
-        json_ruta: {
-          type: 'LineString',
-          coordinates: puntosRuta.map(p => [p.lng, p.lat]),
-          puntos: puntosCompletos,
-          base_inicio: baseInicio,
-          base_fin: baseFin,
-        },
+        coordinates: puntosRuta.map(p => [p.lng, p.lat]),
+        puntos: puntosCompletos,
+        base_inicio: baseInicio,
+        base_fin: baseFin,
       };
 
-      // 1. Crear la ruta en api-rutas (con conductor_id)
-      const createRes = await fetch(`${apiRutaUrl}/rutas`, {
+      const descripcion = `Ruta creada desde el dashboard con ${puntosRuta.length} puntos. Asignada a ${conductorNombre}.`;
+
+      // 1. Crear en Gin (lo que consume la app móvil)
+      const ginCreate = await apiRequest<{ success: boolean; data: { ruta_id: number } }>('/api/rutas/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          nombre: nombreRutaNueva.trim(),
+          descripcion,
+          json_ruta: jsonRutaBase,
+        }),
       });
-      const createJson = await createRes.json().catch(() => ({}));
-      if (!createRes.ok) {
-        throw new Error(createJson?.message || createJson?.error || `Error al crear ruta (${createRes.status})`);
+      const ginRutaId = ginCreate.data.ruta_id;
+      console.log('Ruta creada en Gin:', ginCreate, 'conductor_id:', conductorSeleccionado);
+
+      // 2. Puntos de recolección en Gin
+      for (let i = 0; i < puntosRuta.length; i++) {
+        const punto = puntosRuta[i];
+        const dir = punto.direccionCompleta;
+        const cp =
+          (dir?.cp || punto.direccion || `Punto ${i + 1}`).trim() ||
+          `${punto.lat},${punto.lng}`;
+
+        await apiRequest('/api/puntos-recoleccion/', {
+          method: 'POST',
+          body: JSON.stringify({
+            cp,
+            lat: punto.lat,
+            lon: punto.lng,
+            ruta_id: ginRutaId,
+            punto_id: 0,
+          }),
+        });
       }
 
-      const rutaId = createJson?.data?.ruta_id ?? createJson?.ruta_id;
-      console.log('Ruta creada en api-rutas:', createJson, 'conductor_id:', conductorSeleccionado);
+      // 3. Espejo en api-rutas (listado web / otros clientes)
+      let apiRutasId: number | null = null;
+      if (apiRutaUrl) {
+        try {
+          const createRes = await fetch(`${apiRutaUrl}/rutas`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              nombre: nombreRutaNueva.trim(),
+              descripcion,
+              conductor_id: conductorSeleccionado,
+              json_ruta: jsonRutaBase,
+            }),
+          });
+          const createJson = await createRes.json().catch(() => ({}));
+          if (createRes.ok) {
+            apiRutasId = createJson?.data?.ruta_id ?? createJson?.ruta_id ?? null;
+            console.log('Ruta espejo en api-rutas:', createJson);
+          } else {
+            console.warn('No se pudo espejar en api-rutas:', createRes.status, createJson);
+          }
+        } catch (e) {
+          console.warn('No se pudo espejar en api-rutas:', e);
+        }
+      }
 
-      // 2. Optimizar directo contra el AG (api-rutas NO expone /rutas/:id/optimizar).
+      // 4. Optimizar con AG y persistir geometría en Gin (+ api-rutas si aplica)
       const agUrl = (import.meta.env.VITE_AG_API_URL || 'https://ag.practicasoftware.fun').replace(/\/$/, '');
       console.log('Optimizando ruta con AG:', agUrl);
       try {
@@ -538,28 +579,39 @@ export default function Dashboard() {
           ? optimizacion.todas_las_coords
           : [];
 
-        // Persistir geometría optimizada en api-rutas para que la app móvil la vea.
         const jsonOptimizado = {
-          ...payload.json_ruta,
+          ...jsonRutaBase,
           optimizada: true,
           distancia_total_km: optimizacion.distancia_total_km,
           ruta_optimizada_coords: coordsOpt,
-          // GeoJSON LineString usa [lng, lat]
           coordinates: coordsOpt.map(([lat, lng]) => [lng, lat]),
           segmentos: optimizacion.segmentos ?? [],
         };
 
-        const updateRes = await fetch(`${apiRutaUrl}/rutas/${rutaId}`, {
+        await apiRequest(`/api/rutas/${ginRutaId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            ...payload,
+            nombre: nombreRutaNueva.trim(),
+            descripcion,
             json_ruta: jsonOptimizado,
-            distancia_total: optimizacion.distancia_total_km,
           }),
         });
-        if (!updateRes.ok) {
-          console.warn('AG OK pero no se pudo guardar la geometría en api-rutas:', updateRes.status);
+
+        if (apiRutaUrl && apiRutasId != null) {
+          const updateRes = await fetch(`${apiRutaUrl}/rutas/${apiRutasId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              nombre: nombreRutaNueva.trim(),
+              descripcion,
+              conductor_id: conductorSeleccionado,
+              json_ruta: jsonOptimizado,
+              distancia_total: optimizacion.distancia_total_km,
+            }),
+          });
+          if (!updateRes.ok) {
+            console.warn('AG OK pero no se pudo actualizar api-rutas:', updateRes.status);
+          }
         }
 
         alert(`✓ Ruta "${nombreRutaNueva}" guardada y OPTIMIZADA con ${puntosRuta.length} puntos\n\nAsignada a: ${conductorNombre} (ID ${conductorSeleccionado})\nDistancia: ${distancia} km`);
