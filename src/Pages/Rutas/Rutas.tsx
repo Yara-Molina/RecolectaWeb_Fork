@@ -79,24 +79,40 @@ export default function Rutas() {
         {/* Al crear una ruta se recarga el listado, para no dejarlo desfasado. */}
         <CrearRutaMapa onRutaCreada={cargarRutas} />
 
-        <div className="rutas-list">
-          {loading && <p className="rutas-empty">Cargando rutas...</p>}
-          {!loading && rutas.length === 0 && <p className="rutas-empty">No hay rutas creadas aún.</p>}
-          {rutas.map(ruta => (
-            <div key={ruta.ruta_id} className="ruta-item">
-              <div className="ruta-item-left">
-                <span className="ruta-nombre">{ruta.nombre}</span>
-                {ruta.descripcion && <span className="ruta-desc">{ruta.descripcion}</span>}
+        <section className="rutas-panel">
+          <header className="rutas-panel-head">
+            <h2>Rutas creadas</h2>
+            {!loading && rutas.length > 0 && (
+              <span className="rutas-panel-contador">
+                {rutas.length} ruta{rutas.length === 1 ? '' : 's'}
+              </span>
+            )}
+          </header>
+
+          <div className="rutas-list">
+            {loading && <p className="rutas-empty">Cargando rutas...</p>}
+            {!loading && rutas.length === 0 && <p className="rutas-empty">No hay rutas creadas aún.</p>}
+            {rutas.map(ruta => (
+              <div key={ruta.ruta_id} className="ruta-item">
+                <div className="ruta-item-left">
+                  <span className="ruta-nombre">{ruta.nombre}</span>
+                  {ruta.descripcion && <span className="ruta-desc">{ruta.descripcion}</span>}
+                </div>
+                <div className="ruta-item-right">
+                  <span className="ruta-puntos">{contarPuntos(ruta)} puntos</span>
+                  <button
+                    className="ruta-btn-eliminar"
+                    onClick={() => eliminarRuta(ruta.ruta_id)}
+                    aria-label={`Eliminar ${ruta.nombre}`}
+                    title="Eliminar ruta"
+                  >
+                    <FiTrash2 />
+                  </button>
+                </div>
               </div>
-              <div className="ruta-item-right">
-                <span className="ruta-puntos">{contarPuntos(ruta)} puntos</span>
-                <button className="ruta-btn-eliminar" onClick={() => eliminarRuta(ruta.ruta_id)}>
-                  <FiTrash2 />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );

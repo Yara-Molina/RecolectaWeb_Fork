@@ -16,21 +16,84 @@
   font-size: 14px;
 }
 
+/* Panel del listado. Comparte lenguaje visual con el de creación (borde,
+   radio y fondo) para que la página se lea como dos bloques y no como un
+   mapa seguido de tarjetas sueltas. */
+.rutas-panel {
+  background: #ffffff;
+  border: 1px solid #dce5df;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rutas-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rutas-panel-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #0F676C;
+}
+
+.rutas-panel-contador {
+  font-size: 0.84rem;
+  color: #5a6e60;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Altura acotada con scroll propio: el listado crece con el uso y sin esto
+   empuja el resto de la página hasta perder el mapa de vista. */
 .rutas-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  max-height: 380px;
+  overflow-y: auto;
+  /* Espacio para la barra, para que no se solape con el botón de eliminar. */
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: #c7d3ca transparent;
 }
 
+.rutas-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.rutas-list::-webkit-scrollbar-thumb {
+  background: #c7d3ca;
+  border-radius: 4px;
+}
+
+.rutas-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Filas separadas por una línea en vez de tarjetas independientes: dentro
+   del panel, las tarjetas anidadas competían visualmente con él. */
 .ruta-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 18px;
-  background: #fff;
-  border-radius: 10px;
-  border: 1px solid rgba(15, 103, 108, 0.1);
-  box-shadow: 0 2px 6px rgba(15, 103, 108, 0.06);
+  gap: 12px;
+  padding: 14px 4px;
+  border-bottom: 1px solid #eef2ef;
+  transition: background-color 0.15s ease;
+  background: transparent;
+}
+
+.ruta-item:last-child {
+  border-bottom: none;
+}
+
+.ruta-item:hover {
+  background: #f6f8f7;
 }
 
 .ruta-item-left {
@@ -80,8 +143,9 @@
 }
 
 .rutas-empty {
+  margin: 0;
+  padding: 32px 0;
   text-align: center;
   color: #5a6e60;
-  padding: 40px 0;
   font-size: 14px;
 }
