@@ -190,7 +190,7 @@ export default function Dashboard() {
         // Via gin-backend, igual que el resto: reenvia a api_rutas y aporta
         // la autenticacion que api_rutas no valida por su cuenta.
         type JsonRuta = {
-          puntos?: Array<{ lat: number; lng: number }>;
+          puntos?: Array<{ lat: number; lng: number; nombre?: string; orden?: number }>;
           // El AG guarda aquí la traza que sigue las calles reales del grafo
           // OSM, como pares [lat, lng]. Sin ella solo tenemos los puntos de
           // recolección, que unidos dan líneas rectas a través de las manzanas.
@@ -218,7 +218,23 @@ export default function Dashboard() {
                 ? trazaAG.map((c) => [c[0], c[1]])
                 : (jsonRuta?.puntos || []).map((p) => [p.lat, p.lng]);
 
-            return { ruta_id: r.ruta_id, nombre: r.nombre, conductor_id: r.conductor_id, puntos };
+            // Las paradas van aparte de la traza: la linea la dibuja el
+            // recorrido del AG, y los numeros corresponden a los puntos de
+            // recoleccion en su orden de visita.
+            const paradas = (jsonRuta?.puntos || []).map((p, i) => ({
+              orden: p.orden ?? i + 1,
+              lat: p.lat,
+              lng: p.lng,
+              nombre: p.nombre,
+            }));
+
+            return {
+              ruta_id: r.ruta_id,
+              nombre: r.nombre,
+              conductor_id: r.conductor_id,
+              puntos,
+              paradas,
+            };
           });
           setRutasActivasMapa(rutasData);
         }

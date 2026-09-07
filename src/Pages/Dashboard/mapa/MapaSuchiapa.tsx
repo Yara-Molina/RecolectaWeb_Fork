@@ -26,7 +26,10 @@ interface MapaSuchiapaProps {
     nombre: string;
     conductor_id: number | null;
     conductorNombre?: string;
+    /** Traza del AG: es lo que se dibuja como linea. */
     puntos: Coordenada[];
+    /** Puntos de recoleccion en su orden de visita, para numerarlos. */
+    paradas?: Array<{ orden: number; lat: number; lng: number; nombre?: string }>;
   }>;
   /** Ruta sobre la que esta el cursor en la leyenda: se engrosa y las demas se atenuan. */
   rutaResaltadaId?: number | null;
@@ -98,6 +101,20 @@ export default function MapaSuchiapa({
 
   const [rutaCalles, setRutaCalles] = useState<Coordenada[]>([]);
 
+  // Marcador numerado de punto de recoleccion. Hereda el color de su ruta
+  // para que se sepa a cual pertenece cuando varias se cruzan.
+  const iconoParada = (numero: number, color: string) =>
+    L.divIcon({
+      html:
+        `<div style="background:${color};color:#fff;width:24px;height:24px;` +
+        'border-radius:50%;border:2px solid #fff;display:flex;align-items:center;' +
+        'justify-content:center;font:700 12px/1 system-ui,sans-serif;' +
+        `box-shadow:0 1px 4px rgba(0,0,0,.35)">${numero}</div>`,
+      className: '',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+    });
+
   const truckIconFallback = L.divIcon({
     html: '<div style="font-size:40px;">🚛</div>',
     className: '',
@@ -148,7 +165,15 @@ export default function MapaSuchiapa({
       {seleccionable && onAgregarPunto && <ClickParaPuntos onAgregarPunto={onAgregarPunto} />}
 
       {puntos.map((punto, index) => (
-        <Marker key={index} position={punto} />
+        <Marker
+          key={index}
+          position={punto}
+          // El indice 0 es la base de la que salen los camiones; el resto se
+          // numera 1..N igual que en el listado de abajo.
+          icon={iconoParada(index, index === 0 ? '#0F676C' : '#1E88E5')}
+        >
+          <Tooltip>{index === 0 ? 'Base de inicio' : `Punto ${index}`}</Tooltip>
+        </Marker>
       ))}
 
       {rutaCalles.length >= 2 && (
@@ -192,6 +217,27 @@ export default function MapaSuchiapa({
           </Polyline>
         ) : null;
       })}
+
+      {rutasActivas.flatMap((ruta) =>
+        (ruta.paradas ?? []).map((parada) => (
+          <Marker
+            key={`parada-${ruta.ruta_id}-${parada.orden}`}
+            position={[parada.lat, parada.lng]}
+            icon={iconoParada(parada.orden, colorRuta(ruta.ruta_id))}
+            // Atenuar las paradas de las rutas no resaltadas mantiene legible
+            // la que el usuario esta mirando en la leyenda.
+            opacity={rutaResaltadaId == null || rutaResaltadaId === ruta.ruta_id ? 1 : 0.25}
+          >
+            <Tooltip>
+              <strong>
+                {parada.orden}. {parada.nombre || 'Punto de recoleccion'}
+              </strong>
+              <br />
+              {ruta.nombre}
+            </Tooltip>
+          </Marker>
+        )),
+      )}
 
       {conductoresEnVivo.map((c) => (
         <Fragment key={`conductor-group-${c.conductorId}`}>
