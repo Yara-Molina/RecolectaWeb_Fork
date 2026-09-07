@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import './EstadoRuta.css';
 import { apiRequest, ApiError, getRole } from '../../services/api';
 import { ROLES } from '../../services/auth';
+import { alertaAviso, confirmarEliminacion } from '../../util/alertas';
 import {
   FiMapPin,
   FiSearch,
@@ -149,7 +150,11 @@ export default function EstadoRuta() {
   };
 
   const handleDeletePunto = async (id: number) => {
-    if (!window.confirm('¿Está seguro de eliminar este punto?')) return;
+    const ok = await confirmarEliminacion(
+      '¿Eliminar este punto?',
+      'El punto dejará de formar parte de la ruta. Esta acción no se puede deshacer.',
+    );
+    if (!ok) return;
 
     setSaving(true);
     setError(null);
@@ -172,7 +177,10 @@ export default function EstadoRuta() {
     const lon = Number(formLon);
 
     if (!formCp.trim() || !formRutaId || formLat.trim() === '' || formLon.trim() === '' || Number.isNaN(lat) || Number.isNaN(lon)) {
-      alert('Por favor completa el código postal, la ruta y las coordenadas (lat/lon).');
+      alertaAviso(
+        'Faltan datos',
+        'Completa el código postal, la ruta y las coordenadas (lat/lon).',
+      );
       return;
     }
 

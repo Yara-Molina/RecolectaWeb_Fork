@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { FiAlertTriangle } from 'react-icons/fi';
 import MapaSuchiapa, { type CamionMapa } from './mapa/MapaSuchiapa';
-import { obtenerDireccionCompleta } from './mapa/geocodificacion';
-import { apiRequest, ApiError } from '../../services/api';
+import { colorRuta } from './mapa/coloresRuta';
+import { apiRequest } from '../../services/api';
 import { ROLES } from '../../services/auth';
 import { useTrackingWS } from '../../hooks/useTrackingWS';
 import './Dashboard.css';
@@ -78,22 +78,6 @@ interface RegistroVaciadoDashboard {
   hora: string;
 }
 
-interface DireccionCompleta {
-  display_name: string;
-  calle?: string | null;
-  cp?: string | null;
-  colonia?: string | null;
-  municipio?: string | null;
-  estado?: string | null;
-}
-
-interface PuntoRuta {
-  lat: number;
-  lng: number;
-  direccion: string;
-  direccionCompleta: DireccionCompleta | null;
-}
-
 function estadoDeDisponibilidad(nombre: string): 'alerta' | 'advertencia' | 'ok' {
   if (nombre === 'OPERATIVO') return 'ok';
   if (nombre === 'MANTENIMIENTO') return 'advertencia';
@@ -109,21 +93,6 @@ function labelDisponibilidad(nombre: string): string {
     default: return nombre || '—';
   }
 }
-
-// Base de inicio fija (Laredo Texas, Suchiapa)
-const BASE_INICIO: PuntoRuta = {
-  lat: 16.62910,
-  lng: -93.10414,
-  direccion: 'BASE INICIAL: Laredo Texas, Suchiapa, Chiapas, 29150, México',
-  direccionCompleta: {
-    display_name: 'Laredo Texas, Suchiapa, Chiapas, 29150, México',
-    calle: 'Laredo Texas',
-    cp: '29150',
-    colonia: null,
-    municipio: 'Suchiapa',
-    estado: 'Chiapas'
-  }
-};
 
 // ─── Datos simulados ──────────────────────────────────────────────────────────
 
@@ -169,13 +138,6 @@ export default function Dashboard() {
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
   const [ahora, setAhora]              = useState(new Date());
 
-  const [modoRuta, setModoRuta] = useState(false);
-  const [puntosRuta, setPuntosRuta] = useState<PuntoRuta[]>([]);
-  const [nombreRutaNueva, setNombreRutaNueva] = useState('');
-  const [conductorSeleccionado, setConductorSeleccionado] = useState<number | null>(null);
-  const [guardandoRuta, setGuardandoRuta] = useState(false);
-  const [errorRuta, setErrorRuta] = useState<string | null>(null);
-
   const [anomalias, setAnomalias] = useState<Anomalia[]>([]);
   const [loadingAnomalias, setLoadingAnomalias] = useState(true);
   const [errorAnomalias, setErrorAnomalias] = useState<string | null>(null);
@@ -199,6 +161,22 @@ export default function Dashboard() {
     puntos: Array<[number, number]>;
   }>>([]);
 
+  // Interacción de la leyenda: resaltar al pasar el cursor, encuadrar al pulsar.
+  const [rutaResaltadaId, setRutaResaltadaId] = useState<number | null>(null);
+  const [rutaEnfocadaId, setRutaEnfocadaId] = useState<number | null>(null);
+
+  // Se resuelve aquí y no al cargar las rutas porque la lista de conductores
+  // puede llegar después: así la leyenda se completa sola cuando lo haga.
+  const rutasActivasConConductor = useMemo(
+    () =>
+      rutasActivasMapa.map((ruta) => ({
+        ...ruta,
+        conductorNombre:
+          conductores.find((c) => c.id === ruta.conductor_id)?.nombre ?? undefined,
+      })),
+    [rutasActivasMapa, conductores],
+  );
+
   const { conductores: conductoresEnVivo, conectado: wsConectado } = useTrackingWS();
 
   useEffect(() => {
@@ -209,21 +187,37 @@ export default function Dashboard() {
   useEffect(() => {
     async function cargarRutasActivasMapa() {
       try {
-        const apiRutaUrl = import.meta.env.VITE_API_RUTA_URL || '';
-        if (!apiRutaUrl) return;
-        const res = await fetch(`${apiRutaUrl}/rutas/activas`);
-        if (!res.ok) return;
-        const json = await res.json();
+        // Via gin-backend, igual que el resto: reenvia a api_rutas y aporta
+        // la autenticacion que api_rutas no valida por su cuenta.
+        type JsonRuta = {
+          puntos?: Array<{ lat: number; lng: number }>;
+          // El AG guarda aquí la traza que sigue las calles reales del grafo
+          // OSM, como pares [lat, lng]. Sin ella solo tenemos los puntos de
+          // recolección, que unidos dan líneas rectas a través de las manzanas.
+          ruta_optimizada_coords?: Array<[number, number]>;
+        };
+        type RutaActiva = {
+          ruta_id: number;
+          nombre: string;
+          conductor_id: number | null;
+          json_ruta: string | JsonRuta;
+        };
+
+        const json = await apiRequest<{
+          success: boolean;
+          data: RutaActiva[];
+        }>('/api/rutas/activas');
         if (json.success && Array.isArray(json.data)) {
-          const rutasData = json.data.map((r: {
-            ruta_id: number;
-            nombre: string;
-            conductor_id: number | null;
-            json_ruta: string | { puntos?: Array<{ lat: number; lng: number }> };
-          }) => {
-            const jsonRuta = typeof r.json_ruta === 'string' ? JSON.parse(r.json_ruta) : r.json_ruta;
-            const puntosArr = jsonRuta?.puntos || [];
-            const puntos: [number, number][] = puntosArr.map((p: { lat: number; lng: number }) => [p.lat, p.lng]);
+          const rutasData = json.data.map((r: RutaActiva) => {
+            const jsonRuta: JsonRuta =
+              typeof r.json_ruta === 'string' ? JSON.parse(r.json_ruta) : r.json_ruta;
+
+            const trazaAG = jsonRuta?.ruta_optimizada_coords;
+            const puntos: [number, number][] =
+              Array.isArray(trazaAG) && trazaAG.length >= 2
+                ? trazaAG.map((c) => [c[0], c[1]])
+                : (jsonRuta?.puntos || []).map((p) => [p.lat, p.lng]);
+
             return { ruta_id: r.ruta_id, nombre: r.nombre, conductor_id: r.conductor_id, puntos };
           });
           setRutasActivasMapa(rutasData);
@@ -372,174 +366,6 @@ export default function Dashboard() {
     ruta: RUTAS_GEO[r.id] ?? [],
   }));
 
-  const activarModoRuta = () => {
-    setPuntosRuta([BASE_INICIO]); // Siempre empieza con la base de inicio
-    setNombreRutaNueva('');
-    setErrorRuta(null);
-    setModoRuta(true);
-  };
-
-  const cancelarModoRuta = () => {
-    setModoRuta(false);
-    setPuntosRuta([]);
-    setNombreRutaNueva('');
-    setErrorRuta(null);
-  };
-
-  const agregarPuntoRuta = async (punto: [number, number]) => {
-    const [lat, lng] = punto;
-
-    // No permitir agregar más puntos si se hace clic en la base de inicio
-    if (lat === BASE_INICIO.lat && lng === BASE_INICIO.lng) {
-      return;
-    }
-
-    setPuntosRuta(prev => [...prev, { lat, lng, direccion: 'Buscando dirección…', direccionCompleta: null }]);
-
-    const direccionCompleta = await obtenerDireccionCompleta(punto);
-
-    setPuntosRuta(prev =>
-      prev.map(p => (p.lat === lat && p.lng === lng ? {
-        ...p,
-        direccion: direccionCompleta?.display_name || 'Sin dirección disponible',
-        direccionCompleta
-      } : p)),
-    );
-  };
-
-  const guardarRuta = async () => {
-    if (!nombreRutaNueva.trim()) {
-      setErrorRuta('Ponle un nombre a la ruta antes de guardarla.');
-      return;
-    }
-
-    if (puntosRuta.length < 2) {
-      setErrorRuta('Selecciona al menos 1 punto además de la base inicial.');
-      return;
-    }
-
-    if (!conductorSeleccionado) {
-      setErrorRuta('Selecciona un conductor antes de guardar la ruta.');
-      return;
-    }
-
-    setGuardandoRuta(true);
-    setErrorRuta(null);
-
-    try {
-      // Preparar base_inicio y base_fin para el AG
-      const baseInicio = {
-        lat: BASE_INICIO.lat,
-        lng: BASE_INICIO.lng,
-        nombre: 'Base Inicio'
-      };
-
-      // El último punto será la base de fin
-      const ultimoPunto = puntosRuta[puntosRuta.length - 1];
-      const baseFin = {
-        lat: ultimoPunto.lat,
-        lng: ultimoPunto.lng,
-        nombre: 'Base Fin'
-      };
-
-      const conductorNombre = conductores.find(c => c.id === conductorSeleccionado)?.nombre || 'Sin asignar';
-
-      // Construir array completo de puntos con toda la info (lat, lng, direccion, calle...)
-      const puntosCompletos = puntosRuta.map((p, i) => {
-        const esBaseInicio = i === 0;
-        const esBaseFin = i === puntosRuta.length - 1;
-        const dir = p.direccionCompleta;
-        return {
-          id: i + 1,
-          orden: i + 1,
-          lat: p.lat,
-          lng: p.lng,
-          nombre: p.direccion || `Punto ${i + 1}`,
-          direccion: p.direccion,
-          calle: dir?.calle || null,
-          colonia: dir?.colonia || null,
-          municipio: dir?.municipio || null,
-          estado: dir?.estado || null,
-          cp: dir?.cp || null,
-          es_inicio: esBaseInicio,
-          es_fin: esBaseFin,
-        };
-      });
-
-      console.log('Guardando ruta:', nombreRutaNueva, 'con', puntosRuta.length, 'puntos');
-      console.log('Asignada a:', conductorNombre, '(ID:', conductorSeleccionado, ')');
-      console.log('Puntos completos:', JSON.stringify(puntosCompletos, null, 2));
-
-      // 1. Crear la ruta con conductor asignado y TODOS los puntos en json_ruta
-      const rutaResponse = await apiRequest<{ success: boolean; data: { ruta_id: number } }>('/api/rutas/', {
-        method: 'POST',
-        body: JSON.stringify({
-          nombre: nombreRutaNueva.trim(),
-          descripcion: `Ruta creada desde el dashboard con ${puntosRuta.length} puntos. Asignada a ${conductorNombre}.`,
-          conductor_id: conductorSeleccionado,
-          json_ruta: {
-            type: 'LineString',
-            coordinates: puntosRuta.map(p => [p.lng, p.lat]),
-            puntos: puntosCompletos, // Todos los puntos con lat, lng, direccion
-            base_inicio: baseInicio,
-            base_fin: baseFin
-          },
-        }),
-      });
-
-      console.log('Ruta creada:', rutaResponse);
-      const rutaId = rutaResponse.data.ruta_id;
-
-      // 2. Crear puntos de recolección (contrato gin-backend: cp, lat, lon, ruta_id)
-      console.log('Creando puntos de recolección para ruta', rutaId);
-      for (let i = 0; i < puntosRuta.length; i++) {
-        const punto = puntosRuta[i];
-        const dir = punto.direccionCompleta;
-        const cp =
-          (dir?.cp || punto.direccion || `Punto ${i + 1}`).trim() ||
-          `${punto.lat},${punto.lng}`;
-
-        await apiRequest('/api/puntos-recoleccion/', {
-          method: 'POST',
-          body: JSON.stringify({
-            cp,
-            lat: punto.lat,
-            lon: punto.lng,
-            ruta_id: rutaId,
-            punto_id: 0,
-          }),
-        });
-      }
-
-      console.log('Ruta y puntos guardados exitosamente');
-
-      // 3. Optimizar la ruta con el AG (algoritmo genético)
-      console.log('Optimizando ruta con AG...');
-      try {
-        const optimizacion = await apiRequest<{ success: boolean; message: string; data: any }>(`/api/rutas/${rutaId}/optimizar`, {
-          method: 'POST',
-        });
-        console.log('Ruta optimizada por AG:', optimizacion);
-
-        if (optimizacion.success) {
-          alert(`✓ Ruta "${nombreRutaNueva}" guardada y OPTIMIZADA con ${puntosRuta.length} puntos\n\nAsignada a: ${conductorNombre}\nDistancia: ${optimizacion.data?.distancia_total_km || 'N/A'} km\nBase inicio: Laredo Texas\nBase fin: ${ultimoPunto.direccion}`);
-        } else {
-          alert(`✓ Ruta "${nombreRutaNueva}" guardada con ${puntosRuta.length} puntos\n\n⚠ No se pudo optimizar (AG no disponible)\nAsignada a: ${conductorNombre}`);
-        }
-      } catch (optErr) {
-        console.warn('No se pudo optimizar con AG:', optErr);
-        alert(`✓ Ruta "${nombreRutaNueva}" guardada con ${puntosRuta.length} puntos\n\n⚠ No se optimizó (AG no disponible, revisa que esté corriendo en puerto 8003)\nAsignada a: ${conductorNombre}`);
-      }
-
-      cancelarModoRuta();
-    } catch (err) {
-      console.error('Error guardando ruta:', err);
-      setErrorRuta(err instanceof ApiError ? err.message : 'No se pudo guardar la ruta.');
-    } finally {
-      setGuardandoRuta(false);
-    }
-  };
-
  // SOLO cambia la parte del render (return)
 
 return (
@@ -588,7 +414,7 @@ return (
 
         {/* COLUMNA IZQUIERDA: MAPA + PROGRESO */}
         <div className="left-column">
-          <div className={`card ${modoRuta ? 'card--mapa-expandido' : ''}`}>
+          <div className="card">
             <div className="card-title card-title--flex">
               <span>
                 Mapa de rutas · Tiempo real {wsConectado ? '🟢' : '🔴'}
@@ -596,55 +422,48 @@ return (
                   ? ` (${conductoresEnVivo.length} activo${conductoresEnVivo.length > 1 ? 's' : ''})`
                   : ''}
               </span>
-              {!modoRuta ? (
-                <button className="pager-btn" onClick={activarModoRuta}>Poner ruta</button>
-              ) : (
-                <div className="mapa-ruta-acciones">
-                  <input
-                    className="mapa-ruta-nombre"
-                    placeholder="Nombre de la ruta"
-                    value={nombreRutaNueva}
-                    onChange={(e) => setNombreRutaNueva(e.target.value)}
-                  />
-                  <select
-                    className="camion-selector"
-                    value={conductorSeleccionado ?? ''}
-                    onChange={(e) => setConductorSeleccionado(e.target.value ? Number(e.target.value) : null)}
-                  >
-                    <option value="">Selecciona conductor</option>
-                    {conductores.map(c => (
-                      <option key={c.id} value={c.id}>{c.nombre}</option>
-                    ))}
-                  </select>
-                  <span className="pager-info">{puntosRuta.length} puntos</span>
-                  <button className="pager-btn" onClick={() => setPuntosRuta(prev => prev.slice(0, -1))} disabled={puntosRuta.length <= 1}>Deshacer</button>
-                  <button className="pager-btn" onClick={guardarRuta} disabled={guardandoRuta}>
-                    {guardandoRuta ? 'Guardando…' : 'Guardar ruta'}
-                  </button>
-                  <button className="pager-btn" onClick={cancelarModoRuta}>Cerrar</button>
-                </div>
-              )}
             </div>
-            {errorRuta && <p className="mapa-ruta-error">{errorRuta}</p>}
-            <div className={`mapa-wrap ${modoRuta ? 'mapa-wrap--expandido' : ''}`}>
+            <div className="mapa-wrap">
               <MapaSuchiapa
                 camiones={camionesMapa}
                 conductoresEnVivo={conductoresEnVivo}
-                rutasActivas={rutasActivasMapa}
-                seleccionable={modoRuta}
-                puntos={puntosRuta.map(p => [p.lat, p.lng] as [number, number])}
-                onAgregarPunto={agregarPuntoRuta}
+                rutasActivas={rutasActivasConConductor}
+                rutaResaltadaId={rutaResaltadaId}
+                rutaEnfocadaId={rutaEnfocadaId}
               />
             </div>
-            {modoRuta && puntosRuta.length > 0 && (
-              <ul className="mapa-ruta-lista">
-                {puntosRuta.map((p, i) => (
-                  <li key={`${p.lat}-${p.lng}-${i}`}>
-                    <strong>{i + 1}.</strong> {p.direccion} <span className="mapa-ruta-coords">({p.lat.toFixed(5)}, {p.lng.toFixed(5)})</span>
+
+            {rutasActivasConConductor.length > 0 && (
+              <ul className="mapa-leyenda">
+                {rutasActivasConConductor.map((ruta) => (
+                  <li key={`leyenda-${ruta.ruta_id}`}>
+                    <button
+                      type="button"
+                      className={`mapa-leyenda-item${
+                        rutaResaltadaId === ruta.ruta_id ? ' mapa-leyenda-item--activa' : ''
+                      }`}
+                      onMouseEnter={() => setRutaResaltadaId(ruta.ruta_id)}
+                      onMouseLeave={() => setRutaResaltadaId(null)}
+                      onFocus={() => setRutaResaltadaId(ruta.ruta_id)}
+                      onBlur={() => setRutaResaltadaId(null)}
+                      onClick={() => setRutaEnfocadaId(ruta.ruta_id)}
+                      title={`Centrar el mapa en ${ruta.nombre}`}
+                    >
+                      <span
+                        className="mapa-leyenda-color"
+                        style={{ backgroundColor: colorRuta(ruta.ruta_id) }}
+                        aria-hidden="true"
+                      />
+                      <span className="mapa-leyenda-nombre">{ruta.nombre}</span>
+                      <span className="mapa-leyenda-conductor">
+                        {ruta.conductorNombre ?? 'Sin conductor'}
+                      </span>
+                    </button>
                   </li>
                 ))}
               </ul>
             )}
+
           </div>
         </div>
 

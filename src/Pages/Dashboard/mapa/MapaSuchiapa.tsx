@@ -1,9 +1,10 @@
-import { MapContainer, TileLayer, Marker, Polyline, useMapEvents, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Polyline, Tooltip, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useEffect, useRef, useState, Fragment } from 'react';
 import type { Coordenada } from './geo';
 import { SUCHIAPA_CENTER, SUCHIAPA_BOUNDS } from './constantes';
+import { colorRuta } from './coloresRuta';
 import type { EstadoCamionMapa } from './IconosCamion';
 import { calcularRutaPorCalles } from './rutaPorCalles';
 import type { ConductorEnVivo } from '../../../hooks/useTrackingWS';
@@ -20,7 +21,17 @@ interface MapaSuchiapaProps {
   camiones: CamionMapa[];
   conductoresEnVivo?: ConductorEnVivo[];
   rutaConductor?: Coordenada[];
-  rutasActivas?: Array<{ruta_id: number; nombre: string; conductor_id: number | null; puntos: Coordenada[]}>;
+  rutasActivas?: Array<{
+    ruta_id: number;
+    nombre: string;
+    conductor_id: number | null;
+    conductorNombre?: string;
+    puntos: Coordenada[];
+  }>;
+  /** Ruta sobre la que esta el cursor en la leyenda: se engrosa y las demas se atenuan. */
+  rutaResaltadaId?: number | null;
+  /** Ruta a la que encuadrar el mapa al pulsarla en la leyenda. */
+  rutaEnfocadaId?: number | null;
   seleccionable?: boolean;
   puntos?: Coordenada[];
   onAgregarPunto?: (punto: Coordenada) => void;
@@ -60,11 +71,25 @@ function AjustarTamaño() {
   return null;
 }
 
+/** Encuadra el mapa sobre una ruta. Se remonta al cambiar la ruta enfocada
+ *  (via key), que es lo que dispara el ajuste. */
+function EnfocarRuta({ puntos }: { puntos: Coordenada[] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (puntos.length >= 2) {
+      map.fitBounds(puntos as [number, number][], { padding: [40, 40] });
+    }
+  }, [puntos, map]);
+  return null;
+}
+
 export default function MapaSuchiapa({
   camiones,
   conductoresEnVivo = [],
   rutaConductor,
   rutasActivas = [],
+  rutaResaltadaId = null,
+  rutaEnfocadaId = null,
   seleccionable,
   puntos = [],
   onAgregarPunto,
@@ -128,15 +153,37 @@ export default function MapaSuchiapa({
         <Polyline positions={rutaConductor} pathOptions={{ color: '#E24B4A', weight: 4, opacity: 0.8 }} />
       )}
 
-      {rutasActivas.map((ruta, idx) => {
-        const colores = ['#E53935', '#1E88E5', '#43A047', '#FB8C00', '#8E24AA', '#00ACC1', '#D81B60', '#6D4C41'];
-        const color = colores[idx % colores.length];
+      {rutaEnfocadaId != null && (
+        <EnfocarRuta
+          key={`enfoque-${rutaEnfocadaId}`}
+          puntos={rutasActivas.find((r) => r.ruta_id === rutaEnfocadaId)?.puntos ?? []}
+        />
+      )}
+
+      {rutasActivas.map((ruta) => {
+        // Color estable por ruta_id (ver coloresRuta.ts), no por posición.
+        const color = colorRuta(ruta.ruta_id);
+        const resaltada = rutaResaltadaId === ruta.ruta_id;
+        const hayResaltada = rutaResaltadaId != null;
         return ruta.puntos.length >= 2 ? (
           <Polyline
             key={`ruta-${ruta.ruta_id}`}
             positions={ruta.puntos}
-            pathOptions={{ color, weight: 5, opacity: 0.9 }}
-          />
+            pathOptions={{
+              color,
+              // Atenuar las demas es lo que hace legible una ruta concreta
+              // cuando varias comparten calles.
+              weight: resaltada ? 8 : 5,
+              opacity: !hayResaltada || resaltada ? 0.9 : 0.2,
+            }}
+          >
+            {/* sticky: la etiqueta sigue al cursor a lo largo del trazo, que
+                es lo util cuando varias rutas se solapan en la misma calle. */}
+            <Tooltip sticky>
+              <strong>{ruta.nombre}</strong>
+              {ruta.conductorNombre ? <> · {ruta.conductorNombre}</> : null}
+            </Tooltip>
+          </Polyline>
         ) : null;
       })}
 

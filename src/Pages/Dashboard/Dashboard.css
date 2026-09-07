@@ -256,7 +256,11 @@
   padding: 0;
   background: rgba(255, 255, 255, 0.6);
   height: 500px;
+  width: 100%;
   border-radius: 10px;
+  /* Leaflet pinta sus tiles fuera del radio si no se le acota: sin esto el
+     mapa se desbordaba por el borde derecho de la tarjeta. */
+  overflow: hidden;
 }
 
 .mapa-wrap .leaflet-container {
@@ -737,4 +741,67 @@
   background: var(--primary-soft);
   padding: 4px 10px;
   border-radius: 12px;
+}
+
+/* ── Leyenda de rutas activas ─────────────────────────────────────────────
+   Asocia cada color del mapa con su ruta y conductor. El color lo decide
+   colorRuta(ruta_id) en mapa/coloresRuta.ts, de modo que leyenda y trazo
+   siempre coinciden. */
+
+.mapa-leyenda {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+
+.mapa-leyenda-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.86rem;
+  min-width: 0;
+  /* Es un boton: resetear los estilos del navegador y dejarlo con aspecto
+     de fila de leyenda, pero manteniendo el foco visible por teclado. */
+  appearance: none;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.mapa-leyenda-item:hover,
+.mapa-leyenda-item--activa {
+  background: #f0f4f2;
+  border-color: #dce5df;
+}
+
+.mapa-leyenda-item:focus-visible {
+  outline: 2px solid #0F676C;
+  outline-offset: 2px;
+}
+
+.mapa-leyenda-color {
+  width: 14px;
+  height: 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.mapa-leyenda-nombre {
+  font-weight: 600;
+  color: #1a3a2f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mapa-leyenda-conductor {
+  color: #5a6e60;
+  white-space: nowrap;
 }

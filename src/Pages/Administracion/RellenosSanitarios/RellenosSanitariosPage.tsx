@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiPlus, FiDownload, FiX, FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import "./RellenosSanitariosPage.css";
+import { alertaInfo } from "../../../util/alertas";
 
 import RellenoForm from "./components/RellenoForm";
 import RellenosSanitariosTable from "./components/RellenosTable";
@@ -320,8 +321,9 @@ export default function RellenosSanitariosPage() {
               onDelete={handleDelete}
               readOnly={isConductor}
               onDetails={(relleno) => {
-                alert(
-                  `Detalles:\n\nNombre: ${relleno.nombre}\nDirección: ${relleno.direccion}\nCapacidad: ${relleno.capacidad_toneladas} ton\nTipo: ${relleno.es_rentado ? "Rentado" : "Propio"}`
+                alertaInfo(
+                  relleno.nombre,
+                  `Dirección: ${relleno.direccion}\nCapacidad: ${relleno.capacidad_toneladas} ton\nTipo: ${relleno.es_rentado ? "Rentado" : "Propio"}`
                 );
               }}
             />

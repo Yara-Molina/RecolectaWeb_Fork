@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { FiTrash2 } from 'react-icons/fi';
+import { apiRequest } from '../../services/api';
+import { confirmarEliminacion } from '../../util/alertas';
+import CrearRutaMapa from './CrearRutaMapa';
 import './Rutas.css';
 
 interface RutaItem {
@@ -7,7 +10,9 @@ interface RutaItem {
   nombre: string;
   descripcion: string;
   conductor_id: number | null;
-  json_ruta: any;
+  // Lo devuelve api_rutas: JSON con la geometria y los puntos. Llega como
+  // objeto o como cadena segun el driver de MySQL, de ahi el union.
+  json_ruta: string | { puntos?: unknown[] } | null;
   created_at: string;
 }
 
@@ -15,14 +20,13 @@ export default function Rutas() {
   const [rutas, setRutas] = useState<RutaItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const apiUrl = import.meta.env.VITE_API_RUTA_URL || '';
-
   const cargarRutas = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${apiUrl}/rutas`);
-      if (!res.ok) return;
-      const json = await res.json();
+      // Via gin-backend: valida el JWT y reenvia a api_rutas, que es el dueño
+      // de las rutas. Llamar a api_rutas directo no funciona -- solo escucha
+      // en la red interna.
+      const json = await apiRequest<RutaItem[] | { data: RutaItem[] }>('/api/rutas/');
       if (Array.isArray(json)) {
         setRutas(json);
       } else if (Array.isArray(json.data)) {
@@ -40,9 +44,13 @@ export default function Rutas() {
   }, []);
 
   const eliminarRuta = async (id: number) => {
-    if (!window.confirm('¿Eliminar esta ruta?')) return;
+    const ok = await confirmarEliminacion(
+      '¿Eliminar esta ruta?',
+      'Se borrarán también sus puntos de recolección. Esta acción no se puede deshacer.',
+    );
+    if (!ok) return;
     try {
-      await fetch(`${apiUrl}/rutas/${id}`, { method: 'DELETE' });
+      await apiRequest(`/api/rutas/${id}`, { method: 'DELETE' });
       setRutas(prev => prev.filter(r => r.ruta_id !== id));
     } catch (err) {
       console.error('Error eliminando ruta:', err);
@@ -65,8 +73,11 @@ export default function Rutas() {
       <div className="rutas-container">
         <header className="rutas-header">
           <h1>Rutas</h1>
-          <p>Listado de rutas creadas desde el Dashboard</p>
+          <p>Crea rutas sobre el mapa y consulta las existentes</p>
         </header>
+
+        {/* Al crear una ruta se recarga el listado, para no dejarlo desfasado. */}
+        <CrearRutaMapa onRutaCreada={cargarRutas} />
 
         <div className="rutas-list">
           {loading && <p className="rutas-empty">Cargando rutas...</p>}

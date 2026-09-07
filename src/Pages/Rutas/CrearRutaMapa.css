@@ -1,0 +1,104 @@
+/* Panel de creación de rutas, encima del listado. */
+
+.crear-ruta {
+  background: #ffffff;
+  border: 1px solid #dce5df;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  /* Recorta el mapa a las esquinas del panel: Leaflet pinta sus tiles
+     fuera del radio si no se le acota aquí. */
+  overflow: hidden;
+}
+
+.crear-ruta-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.crear-ruta-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #0F676C;
+}
+
+.crear-ruta-head p {
+  margin: 4px 0 0;
+  font-size: 0.87rem;
+  color: #5a6e60;
+}
+
+.crear-ruta-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.crear-ruta-nombre,
+.crear-ruta-conductor {
+  border: 1px solid #dce5df;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  color: #1a3a2f;
+  background: #ffffff;
+}
+
+.crear-ruta-nombre:focus-visible,
+.crear-ruta-conductor:focus-visible {
+  outline: 2px solid #0F676C;
+  outline-offset: 1px;
+}
+
+.crear-ruta-contador {
+  font-size: 0.84rem;
+  color: #5a6e60;
+  white-space: nowrap;
+}
+
+.crear-ruta-error {
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: #f7e7e3;
+  color: #9A382A;
+  font-size: 0.88rem;
+}
+
+.crear-ruta-mapa {
+  height: 460px;
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.crear-ruta-mapa .leaflet-container {
+  height: 100%;
+  width: 100%;
+}
+
+.crear-ruta-lista {
+  margin: 0;
+  padding-left: 1.3em;
+  max-height: 180px;
+  overflow-y: auto;
+  font-size: 0.86rem;
+  color: #1a3a2f;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.crear-ruta-coords {
+  color: #5a6e60;
+  margin-left: 6px;
+  font-variant-numeric: tabular-nums;
+}
