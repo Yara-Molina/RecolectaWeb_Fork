@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import MapaSuchiapa from '../Dashboard/mapa/MapaSuchiapa';
 import { obtenerDireccionCompleta } from '../Dashboard/mapa/geocodificacion';
 import { apiRequest, ApiError } from '../../services/api';
@@ -55,6 +55,13 @@ export default function CrearRutaMapa({ onRutaCreada }: { onRutaCreada: () => vo
   const [guardandoRuta, setGuardandoRuta] = useState(false);
   const [errorRuta, setErrorRuta] = useState<string | null>(null);
   const [conductores, setConductores] = useState<ConductorOpcion[]>([]);
+
+  // Identidad estable: sin esto el array se recrea en cada render y el efecto
+  // de MapaSuchiapa que calcula la ruta por calles entra en bucle.
+  const coordenadas = useMemo(
+    () => puntosRuta.map((p) => [p.lat, p.lng] as [number, number]),
+    [puntosRuta],
+  );
 
   useEffect(() => {
     let cancelado = false;
@@ -311,7 +318,7 @@ export default function CrearRutaMapa({ onRutaCreada }: { onRutaCreada: () => vo
         <MapaSuchiapa
           camiones={[]}
           seleccionable
-          puntos={puntosRuta.map((p) => [p.lat, p.lng] as [number, number])}
+          puntos={coordenadas}
           onAgregarPunto={agregarPuntoRuta}
         />
       </div>

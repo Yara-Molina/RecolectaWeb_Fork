@@ -105,6 +105,11 @@ export default function MapaSuchiapa({
     iconAnchor: [25, 25],
   });
 
+  // Se depende del CONTENIDO y no de la identidad del array: cualquier padre
+  // que construya `puntos` en linea lo recrearia en cada render y este efecto
+  // entraria en bucle (Maximum update depth exceeded).
+  const puntosKey = puntos.map((p) => `${p[0]},${p[1]}`).join('|');
+
   useEffect(() => {
     if (puntos.length < 2) {
       setRutaCalles([]);
@@ -120,7 +125,8 @@ export default function MapaSuchiapa({
     return () => {
       cancelado = true;
     };
-  }, [puntos]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [puntosKey]);
 
   return (
     <MapContainer
