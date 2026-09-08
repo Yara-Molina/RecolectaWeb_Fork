@@ -48,7 +48,23 @@ const BASE_INICIO: PuntoRuta = {
   },
 };
 
-export default function CrearRutaMapa({ onRutaCreada }: { onRutaCreada: () => void }) {
+export interface RutaEnEdicion {
+  ruta_id: number;
+  nombre: string;
+  conductor_id: number | null;
+  puntos: Array<{ lat: number; lng: number; nombre?: string; direccion?: string }>;
+}
+
+export default function CrearRutaMapa({
+  onRutaCreada,
+  rutaEnEdicion = null,
+  onCancelarEdicion,
+}: {
+  onRutaCreada: () => void;
+  /** Si viene, el panel edita los puntos de esa ruta en lugar de crear una. */
+  rutaEnEdicion?: RutaEnEdicion | null;
+  onCancelarEdicion?: () => void;
+}) {
   const [puntosRuta, setPuntosRuta] = useState<PuntoRuta[]>([BASE_INICIO]);
   const [nombreRutaNueva, setNombreRutaNueva] = useState('');
   const [conductorSeleccionado, setConductorSeleccionado] = useState<number | null>(null);
@@ -62,6 +78,27 @@ export default function CrearRutaMapa({ onRutaCreada }: { onRutaCreada: () => vo
     () => puntosRuta.map((p) => [p.lat, p.lng] as [number, number]),
     [puntosRuta],
   );
+
+  // Al entrar en edicion se precargan sus puntos; al salir, se vuelve al
+  // estado inicial de creacion.
+  useEffect(() => {
+    if (!rutaEnEdicion) {
+      reiniciar();
+      return;
+    }
+    setNombreRutaNueva(rutaEnEdicion.nombre);
+    setConductorSeleccionado(rutaEnEdicion.conductor_id);
+    setErrorRuta(null);
+    setPuntosRuta([
+      BASE_INICIO,
+      ...rutaEnEdicion.puntos.map((p) => ({
+        lat: p.lat,
+        lng: p.lng,
+        direccion: p.direccion || p.nombre || 'Punto de recoleccion',
+        direccionCompleta: null,
+      })),
+    ]);
+  }, [rutaEnEdicion]);
 
   useEffect(() => {
     let cancelado = false;
@@ -136,6 +173,25 @@ export default function CrearRutaMapa({ onRutaCreada }: { onRutaCreada: () => vo
     setErrorRuta(null);
 
     try {
+      // Un conductor no puede llevar dos rutas activas a la vez: la app movil
+      // consulta /rutas/activas?conductor_id=N y se queda con la de id mas
+      // alto, asi que con dos activas el conductor veria una ruta arbitraria.
+      if (!rutaEnEdicion) {
+        const activas = await apiRequest<{ success: boolean; data: Array<{ ruta_id: number; nombre: string }> }>(
+          `/api/rutas/activas?conductor_id=${conductorSeleccionado}`,
+        );
+        const enCurso = activas.data ?? [];
+        if (enCurso.length > 0) {
+          setGuardandoRuta(false);
+          setErrorRuta(
+            `${conductores.find((c) => c.id === conductorSeleccionado)?.nombre ?? 'Ese conductor'} ` +
+              `ya tiene una ruta activa ("${enCurso[0].nombre}"). Desactivala desde el listado ` +
+              'antes de asignarle otra.',
+          );
+          return;
+        }
+      }
+
       // Preparar base_inicio y base_fin para el AG
       const baseInicio = {
         lat: BASE_INICIO.lat,
@@ -179,25 +235,48 @@ export default function CrearRutaMapa({ onRutaCreada }: { onRutaCreada: () => vo
       console.log('Asignada a:', conductorNombre, '(ID:', conductorSeleccionado, ')');
       console.log('Puntos completos:', JSON.stringify(puntosCompletos, null, 2));
 
-      // 1. Crear la ruta con conductor asignado y TODOS los puntos en json_ruta
-      const rutaResponse = await apiRequest<{ success: boolean; data: { ruta_id: number } }>('/api/rutas/', {
-        method: 'POST',
-        body: JSON.stringify({
-          nombre: nombreRutaNueva.trim(),
-          descripcion: `Ruta creada desde el dashboard con ${puntosRuta.length} puntos. Asignada a ${conductorNombre}.`,
-          conductor_id: conductorSeleccionado,
-          json_ruta: {
-            type: 'LineString',
-            coordinates: puntosRuta.map(p => [p.lng, p.lat]),
-            puntos: puntosCompletos, // Todos los puntos con lat, lng, direccion
-            base_inicio: baseInicio,
-            base_fin: baseFin
-          },
-        }),
-      });
+      const jsonRuta = {
+        type: 'LineString',
+        coordinates: puntosRuta.map(p => [p.lng, p.lat]),
+        puntos: puntosCompletos, // Todos los puntos con lat, lng, direccion
+        base_inicio: baseInicio,
+        base_fin: baseFin,
+      };
 
-      console.log('Ruta creada:', rutaResponse);
-      const rutaId = rutaResponse.data.ruta_id;
+      let rutaId: number;
+
+      if (rutaEnEdicion) {
+        // 1a. Editar: se conservan nombre y conductor, solo cambian los puntos.
+        rutaId = rutaEnEdicion.ruta_id;
+        await apiRequest(`/api/rutas/${rutaId}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            descripcion: `Ruta editada desde el dashboard con ${puntosRuta.length - 1} puntos. Asignada a ${conductorNombre}.`,
+            json_ruta: jsonRuta,
+          }),
+        });
+
+        // Los puntos se reemplazan, no se actualizan uno a uno: el orden y el
+        // numero cambian con la edicion, y el AG reescribe las esquinas.
+        const previos = await apiRequest<{ success: boolean; data: Array<{ punto_id: number }> }>(
+          `/api/puntos-recoleccion/ruta/${rutaId}`,
+        );
+        for (const p of previos.data ?? []) {
+          await apiRequest(`/api/puntos-recoleccion/${p.punto_id}`, { method: 'DELETE' });
+        }
+      } else {
+        // 1b. Crear la ruta con conductor asignado y los puntos en json_ruta
+        const rutaResponse = await apiRequest<{ success: boolean; data: { ruta_id: number } }>('/api/rutas/', {
+          method: 'POST',
+          body: JSON.stringify({
+            nombre: nombreRutaNueva.trim(),
+            descripcion: `Ruta creada desde el dashboard con ${puntosRuta.length - 1} puntos. Asignada a ${conductorNombre}.`,
+            conductor_id: conductorSeleccionado,
+            json_ruta: jsonRuta,
+          }),
+        });
+        rutaId = rutaResponse.data.ruta_id;
+      }
 
       // 2. Crear puntos de recolección (contrato api_rutas: ruta_id, lat, lon
       //    requeridos; el resto opcional pero necesario para el AG)
@@ -275,8 +354,12 @@ export default function CrearRutaMapa({ onRutaCreada }: { onRutaCreada: () => vo
     <section className="crear-ruta">
       <header className="crear-ruta-head">
         <div>
-          <h2>Crear ruta</h2>
-          <p>Marca los puntos de recoleccion en el mapa, en el orden que prefieras.</p>
+          <h2>{rutaEnEdicion ? `Editar puntos de "${rutaEnEdicion.nombre}"` : 'Crear ruta'}</h2>
+          <p>
+            {rutaEnEdicion
+              ? 'Anade o quita puntos. El nombre y el conductor no se modifican aqui.'
+              : 'Marca los puntos de recoleccion en el mapa, en el orden que prefieras.'}
+          </p>
         </div>
         <div className="crear-ruta-acciones">
           <input
@@ -284,11 +367,13 @@ export default function CrearRutaMapa({ onRutaCreada }: { onRutaCreada: () => vo
             placeholder="Nombre de la ruta"
             value={nombreRutaNueva}
             onChange={(e) => setNombreRutaNueva(e.target.value)}
+            disabled={!!rutaEnEdicion}
           />
           <select
             className="crear-ruta-conductor"
             value={conductorSeleccionado ?? ''}
             onChange={(e) => setConductorSeleccionado(e.target.value ? Number(e.target.value) : null)}
+            disabled={!!rutaEnEdicion}
           >
             <option value="">Selecciona conductor</option>
             {conductores.map((c) => (
@@ -307,8 +392,13 @@ export default function CrearRutaMapa({ onRutaCreada }: { onRutaCreada: () => vo
             Deshacer
           </button>
           <button type="button" className="pager-btn" onClick={guardarRuta} disabled={guardandoRuta}>
-            {guardandoRuta ? 'Guardando...' : 'Guardar ruta'}
+            {guardandoRuta ? 'Guardando...' : rutaEnEdicion ? 'Guardar cambios' : 'Guardar ruta'}
           </button>
+          {rutaEnEdicion && onCancelarEdicion && (
+            <button type="button" className="pager-btn" onClick={onCancelarEdicion} disabled={guardandoRuta}>
+              Cancelar
+            </button>
+          )}
         </div>
       </header>
 

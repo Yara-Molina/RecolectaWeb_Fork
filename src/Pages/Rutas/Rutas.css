@@ -149,3 +149,47 @@
   color: #5a6e60;
   font-size: 14px;
 }
+
+/* Estado y acciones por fila */
+
+.ruta-estado {
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #eef2ef;
+  color: #5a6e60;
+  white-space: nowrap;
+}
+
+.ruta-estado--activa {
+  background: #e2efea;
+  color: #0F676C;
+}
+
+.ruta-btn {
+  appearance: none;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 7px;
+  display: inline-flex;
+  color: #5a6e60;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.ruta-btn:hover {
+  background: #eef2ef;
+  color: #0F676C;
+}
+
+.ruta-btn:focus-visible {
+  outline: 2px solid #0F676C;
+  outline-offset: 1px;
+}
+
+.ruta-btn-eliminar:hover {
+  background: #f7e7e3;
+  color: #E24B4A;
+}
