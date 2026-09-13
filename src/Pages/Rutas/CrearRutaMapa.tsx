@@ -52,7 +52,7 @@ export interface RutaEnEdicion {
   ruta_id: number;
   nombre: string;
   conductor_id: number | null;
-  puntos: Array<{ lat: number; lng: number; nombre?: string; direccion?: string }>;
+  puntos: Array<{ lat: number; lng: number; nombre?: string; direccion?: string; cp?: string | null }>;
 }
 
 export default function CrearRutaMapa({
@@ -95,7 +95,10 @@ export default function CrearRutaMapa({
         lat: p.lat,
         lng: p.lng,
         direccion: p.direccion || p.nombre || 'Punto de recoleccion',
-        direccionCompleta: null,
+        // Se conserva el codigo postal ya guardado: volver a geocodificar
+        // cada punto al editar seria lento y golpearia a Nominatim sin
+        // necesidad.
+        direccionCompleta: p.cp ? { display_name: p.direccion ?? '', cp: p.cp } : null,
       })),
     ]);
   }, [rutaEnEdicion]);
@@ -244,6 +247,7 @@ export default function CrearRutaMapa({
       };
 
       let rutaId: number;
+      let puntosAEliminar: number[] = [];
 
       if (rutaEnEdicion) {
         // 1a. Editar: se conservan nombre y conductor, solo cambian los puntos.
@@ -258,12 +262,16 @@ export default function CrearRutaMapa({
 
         // Los puntos se reemplazan, no se actualizan uno a uno: el orden y el
         // numero cambian con la edicion, y el AG reescribe las esquinas.
+        //
+        // Solo se anotan aqui; se borran DESPUES de crear los nuevos. Borrar
+        // primero dejaba la ruta sin puntos si la creacion fallaba a medias, y
+        // una ruta vacia desaparece de la app del conductor sin aviso. Al
+        // invertir el orden, un fallo deja puntos duplicados: visible y
+        // recuperable, en lugar de silencioso.
         const previos = await apiRequest<{ success: boolean; data: Array<{ punto_id: number }> }>(
           `/api/puntos-recoleccion/ruta/${rutaId}`,
         );
-        for (const p of previos.data ?? []) {
-          await apiRequest(`/api/puntos-recoleccion/${p.punto_id}`, { method: 'DELETE' });
-        }
+        puntosAEliminar = (previos.data ?? []).map((p) => p.punto_id);
       } else {
         // 1b. Crear la ruta con conductor asignado y los puntos en json_ruta
         const rutaResponse = await apiRequest<{ success: boolean; data: { ruta_id: number } }>('/api/rutas/', {
@@ -283,9 +291,12 @@ export default function CrearRutaMapa({
       console.log('Creando puntos de recolección para ruta', rutaId);
       for (let i = 0; i < puntosCompletos.length; i++) {
         const punto = puntosCompletos[i];
-        const cp =
-          (punto.cp || punto.direccion || `Punto ${i + 1}`).trim() ||
-          `${punto.lat},${punto.lng}`;
+        // `cp` es VARCHAR(10) en api_rutas: solo cabe un codigo postal. El
+        // codigo anterior caia a la direccion completa cuando faltaba, y MySQL
+        // rechazaba la fila con "Data too long for column 'cp'". La direccion
+        // ya viaja en su propia columna, asi que aqui se deja vacio.
+        const cpBruto = (punto.cp ?? '').trim();
+        const cp = cpBruto.length > 0 && cpBruto.length <= 10 ? cpBruto : null;
 
         await apiRequest('/api/puntos-recoleccion/', {
           method: 'POST',
@@ -309,6 +320,12 @@ export default function CrearRutaMapa({
             es_fin: punto.es_fin,
           }),
         });
+      }
+
+      // Los nuevos puntos ya estan escritos: ahora si se pueden retirar los
+      // anteriores sin riesgo de dejar la ruta vacia.
+      for (const puntoId of puntosAEliminar) {
+        await apiRequest(`/api/puntos-recoleccion/${puntoId}`, { method: 'DELETE' });
       }
 
       console.log('Ruta y puntos guardados exitosamente');

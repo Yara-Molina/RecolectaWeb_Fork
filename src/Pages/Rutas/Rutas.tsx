@@ -70,13 +70,13 @@ export default function Rutas() {
 
   const editarPuntos = async (ruta: RutaItem) => {
     try {
-      const res = await apiRequest<{ success: boolean; data: Array<{ lat: number; lon: number; nombre?: string; direccion?: string; es_inicio?: boolean | number }> }>(
+      const res = await apiRequest<{ success: boolean; data: Array<{ lat: number; lon: number; nombre?: string; direccion?: string; cp?: string | null; es_inicio?: boolean | number }> }>(
         `/api/puntos-recoleccion/ruta/${ruta.ruta_id}`,
       );
       // La base se reanade sola al entrar en edicion, asi que aqui se excluye.
       const puntos = (res.data ?? [])
         .filter((p) => !(p.es_inicio === true || p.es_inicio === 1))
-        .map((p) => ({ lat: p.lat, lng: p.lon, nombre: p.nombre, direccion: p.direccion }));
+        .map((p) => ({ lat: p.lat, lng: p.lon, nombre: p.nombre, direccion: p.direccion, cp: p.cp }));
 
       setRutaEnEdicion({
         ruta_id: ruta.ruta_id,
