@@ -42,6 +42,22 @@ export function alertaExito(titulo: string, texto?: string) {
   });
 }
 
+// Diálogo de proceso en curso: spinner, sin botones y no cerrable a mano. Se
+// reemplaza solo cuando después se llama a otra alerta (SweetAlert reutiliza el
+// mismo modal), así que el flujo típico es alertaCargando(...) -> await tarea
+// -> alertaExito/alertaError.
+export function alertaCargando(titulo: string, texto?: string) {
+  return Swal.fire({
+    ...BASE,
+    title: titulo,
+    html: aHtml(texto),
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    showConfirmButton: false,
+    didOpen: () => Swal.showLoading(),
+  });
+}
+
 export function alertaError(titulo: string, texto?: string) {
   return Swal.fire({
     ...BASE,

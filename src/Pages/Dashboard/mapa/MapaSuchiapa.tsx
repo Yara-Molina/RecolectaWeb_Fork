@@ -1,12 +1,11 @@
 import { MapContainer, TileLayer, Marker, Polyline, Tooltip, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { useEffect, useRef, useState, Fragment } from 'react';
+import { useEffect, useRef, Fragment } from 'react';
 import type { Coordenada } from './geo';
 import { SUCHIAPA_CENTER, SUCHIAPA_BOUNDS } from './constantes';
 import { colorRuta } from './coloresRuta';
 import type { EstadoCamionMapa } from './IconosCamion';
-import { calcularRutaPorCalles } from './rutaPorCalles';
 import type { ConductorEnVivo } from '../../../hooks/useTrackingWS';
 
 interface CamionMapa {
@@ -37,6 +36,10 @@ interface MapaSuchiapaProps {
   rutaEnfocadaId?: number | null;
   seleccionable?: boolean;
   puntos?: Coordenada[];
+  /** Traza real del AG para la previsualizacion. Si falta, los puntos se unen
+   *  con lineas rectas: no se inventa una geometria por calles que no coincida
+   *  con la que seguira el conductor. */
+  trazaReal?: Coordenada[];
   onAgregarPunto?: (punto: Coordenada) => void;
 }
 
@@ -95,11 +98,18 @@ export default function MapaSuchiapa({
   rutaEnfocadaId = null,
   seleccionable,
   puntos = [],
+  trazaReal,
   onAgregarPunto,
 }: MapaSuchiapaProps) {
   void camiones;
 
-  const [rutaCalles, setRutaCalles] = useState<Coordenada[]>([]);
+  // Linea de la previsualizacion. Antes se pedia a OSRM (servidor publico), que
+  // dibujaba con su propio mapa de sentidos y en el orden de clic sin optimizar:
+  // rodeos y cruces que no coincidian con la ruta real del conductor, la cual
+  // sigue la geometria del AG. Ahora se dibuja esa traza real cuando existe; si
+  // aun no, los puntos unidos en orden (lineas rectas), sin geometria inventada.
+  const lineaPreview: Coordenada[] =
+    trazaReal && trazaReal.length >= 2 ? trazaReal : puntos;
 
   // Marcador numerado de punto de recoleccion. Hereda el color de su ruta
   // para que se sepa a cual pertenece cuando varias se cruzan.
@@ -121,29 +131,6 @@ export default function MapaSuchiapa({
     iconSize: [50, 50],
     iconAnchor: [25, 25],
   });
-
-  // Se depende del CONTENIDO y no de la identidad del array: cualquier padre
-  // que construya `puntos` en linea lo recrearia en cada render y este efecto
-  // entraria en bucle (Maximum update depth exceeded).
-  const puntosKey = puntos.map((p) => `${p[0]},${p[1]}`).join('|');
-
-  useEffect(() => {
-    if (puntos.length < 2) {
-      setRutaCalles([]);
-      return;
-    }
-
-    let cancelado = false;
-
-    calcularRutaPorCalles(puntos).then((resultado) => {
-      if (!cancelado) setRutaCalles(resultado);
-    });
-
-    return () => {
-      cancelado = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [puntosKey]);
 
   return (
     <MapContainer
@@ -176,8 +163,8 @@ export default function MapaSuchiapa({
         </Marker>
       ))}
 
-      {rutaCalles.length >= 2 && (
-        <Polyline positions={rutaCalles} pathOptions={{ color: '#0F676C', weight: 4 }} />
+      {lineaPreview.length >= 2 && (
+        <Polyline positions={lineaPreview} pathOptions={{ color: '#0F676C', weight: 4 }} />
       )}
 
       {rutaConductor && rutaConductor.length >= 2 && (

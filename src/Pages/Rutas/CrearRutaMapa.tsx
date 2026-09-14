@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
+import { FiChevronDown, FiCornerUpLeft } from 'react-icons/fi';
 import MapaSuchiapa from '../Dashboard/mapa/MapaSuchiapa';
+import type { Coordenada } from '../Dashboard/mapa/geo';
 import { obtenerDireccionCompleta } from '../Dashboard/mapa/geocodificacion';
 import { apiRequest, ApiError } from '../../services/api';
-import { alertaExito, alertaAviso } from '../../util/alertas';
+import { alertaExito, alertaAviso, alertaCargando, alertaError } from '../../util/alertas';
 import { ROLES } from '../../services/auth';
 import './CrearRutaMapa.css';
 
@@ -72,6 +74,14 @@ export default function CrearRutaMapa({
   const [errorRuta, setErrorRuta] = useState<string | null>(null);
   const [conductores, setConductores] = useState<ConductorOpcion[]>([]);
 
+  const [previsualizando, setPrevisualizando] = useState(false);
+
+  // Traza real que devuelve el AG: es lo que dibuja el mapa como recorrido, en
+  // lugar de la vieja linea OSRM. La previsualizacion la pide SIN persistir la
+  // ruta (endpoint /api/rutas/preview), asi que no exige conductor ni crea
+  // nada. Se invalida al cambiar los puntos, porque dejaria de corresponder.
+  const [trazaReal, setTrazaReal] = useState<Coordenada[] | null>(null);
+
   // Identidad estable: sin esto el array se recrea en cada render y el efecto
   // de MapaSuchiapa que calcula la ruta por calles entra en bucle.
   const coordenadas = useMemo(
@@ -133,6 +143,7 @@ export default function CrearRutaMapa({
     setNombreRutaNueva('');
     setConductorSeleccionado(null);
     setErrorRuta(null);
+    setTrazaReal(null);
   };
 
   const agregarPuntoRuta = async (punto: [number, number]) => {
@@ -142,6 +153,9 @@ export default function CrearRutaMapa({
     if (lat === BASE_INICIO.lat && lng === BASE_INICIO.lng) {
       return;
     }
+
+    // La traza del AG mostrada deja de ser valida en cuanto cambian los puntos.
+    setTrazaReal(null);
 
     setPuntosRuta(prev => [...prev, { lat, lng, direccion: 'Buscando dirección…', direccionCompleta: null }]);
 
@@ -154,6 +168,70 @@ export default function CrearRutaMapa({
         direccionCompleta
       } : p)),
     );
+  };
+
+  // Previsualiza el recorrido real SIN guardar nada: manda los puntos actuales
+  // al AG (a traves de /api/rutas/preview, que no toca la base) y dibuja la
+  // geometria que devuelve. No requiere conductor ni nombre.
+  const previsualizarRutaReal = async () => {
+    setErrorRuta(null);
+    if (puntosRuta.length < 3) {
+      setErrorRuta('Coloca la base y al menos 2 puntos para previsualizar el recorrido.');
+      return;
+    }
+
+    setPrevisualizando(true);
+    // Mensaje de proceso en curso (se reemplaza al terminar por éxito o error).
+    alertaCargando(
+      'Procesando ruta',
+      'Calculando el recorrido óptimo por las calles con el algoritmo…',
+    );
+    try {
+      const ultimo = puntosRuta[puntosRuta.length - 1];
+      const intermedios = puntosRuta.slice(1, -1);
+      const payload = {
+        base_inicio: { lat: BASE_INICIO.lat, lng: BASE_INICIO.lng, nombre: 'Base Inicio' },
+        base_fin: { lat: ultimo.lat, lng: ultimo.lng, nombre: 'Base Fin' },
+        puntos: intermedios.map((p, i) => ({
+          id: String(i + 1),
+          lat: p.lat,
+          lng: p.lng,
+          nombre: p.direccion || `Punto ${i + 1}`,
+        })),
+        bloqueos: [],
+      };
+
+      const resp = await apiRequest<{
+        success: boolean;
+        data?: { coordenadas?: Coordenada[]; distancia_total_km?: number };
+      }>('/api/rutas/preview', { method: 'POST', body: JSON.stringify(payload) });
+
+      const coords = resp.data?.coordenadas;
+      if (resp.success && Array.isArray(coords) && coords.length >= 2) {
+        setTrazaReal(coords);
+        const km = resp.data?.distancia_total_km;
+        await alertaExito(
+          'Ruta terminada',
+          `El mapa muestra el recorrido real que seguirá el conductor.${
+            km != null ? `\nDistancia total: ${km} km` : ''
+          }`,
+        );
+      } else {
+        setTrazaReal(null);
+        await alertaError(
+          'Error al procesar la ruta',
+          'El optimizador no devolvió un recorrido válido. Revisa los puntos o comprueba que el servicio del algoritmo esté disponible.',
+        );
+      }
+    } catch (err) {
+      setTrazaReal(null);
+      await alertaError(
+        'Error al procesar la ruta',
+        err instanceof ApiError ? err.message : 'No se pudo contactar con el servicio de optimización.',
+      );
+    } finally {
+      setPrevisualizando(false);
+    }
   };
 
   const guardarRuta = async () => {
@@ -367,81 +445,127 @@ export default function CrearRutaMapa({
     }
   };
 
+  const numPuntos = puntosRuta.length - 1;
+  const ocupado = guardandoRuta || previsualizando;
+
   return (
     <section className="crear-ruta">
-      <header className="crear-ruta-head">
-        <div>
-          <h2>{rutaEnEdicion ? `Editar puntos de "${rutaEnEdicion.nombre}"` : 'Crear ruta'}</h2>
-          <p>
-            {rutaEnEdicion
-              ? 'Anade o quita puntos. El nombre y el conductor no se modifican aqui.'
-              : 'Marca los puntos de recoleccion en el mapa, en el orden que prefieras.'}
-          </p>
-        </div>
-        <div className="crear-ruta-acciones">
-          <input
-            className="crear-ruta-nombre"
-            placeholder="Nombre de la ruta"
-            value={nombreRutaNueva}
-            onChange={(e) => setNombreRutaNueva(e.target.value)}
-            disabled={!!rutaEnEdicion}
+      <div className="crear-ruta-grid">
+        <aside className="cr-sidebar">
+          <div className="cr-sidebar-scroll">
+            <h3 className="cr-sidebar-title">
+              {rutaEnEdicion ? `Editar "${rutaEnEdicion.nombre}"` : 'Crear ruta'}
+            </h3>
+            <p className="cr-sidebar-instr">
+              {rutaEnEdicion
+                ? 'Añade o quita puntos. El nombre y el conductor no se modifican aquí.'
+                : 'Sigue los pasos a continuación:'}
+            </p>
+
+            <div className="cr-step">
+              <span className="cr-step-num">1</span>
+              <span className="cr-step-label">Nombre de la ruta</span>
+            </div>
+            <input
+              className="cr-input"
+              placeholder="Nombre de la ruta"
+              value={nombreRutaNueva}
+              onChange={(e) => setNombreRutaNueva(e.target.value)}
+              disabled={!!rutaEnEdicion}
+            />
+
+            <div className="cr-step">
+              <span className="cr-step-num">2</span>
+              <span className="cr-step-label">Conductor asignado</span>
+            </div>
+            <div className="cr-select-wrap">
+              <select
+                className="cr-select"
+                value={conductorSeleccionado ?? ''}
+                onChange={(e) => setConductorSeleccionado(e.target.value ? Number(e.target.value) : null)}
+                disabled={!!rutaEnEdicion}
+              >
+                <option value="">Selecciona conductor</option>
+                {conductores.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
+                ))}
+              </select>
+              <FiChevronDown className="cr-select-chevron" aria-hidden />
+            </div>
+
+            <div className="cr-step">
+              <span className="cr-step-num">3</span>
+              <span className="cr-step-label">Marca los puntos en el mapa</span>
+            </div>
+            <span className="cr-badge">
+              {numPuntos} punto{numPuntos === 1 ? '' : 's'} agregado{numPuntos === 1 ? '' : 's'}
+            </span>
+
+            {numPuntos > 0 && (
+              <ol className="cr-points">
+                {puntosRuta.map((p, i) => (
+                  <li key={`${p.lat}-${p.lng}-${i}`} className="cr-point">
+                    <span className="cr-point-num">{i === 0 ? 'B' : i}</span>
+                    <span className="cr-point-dir">{p.direccion}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+
+          <div className="cr-actions">
+            {errorRuta && <p className="crear-ruta-error">{errorRuta}</p>}
+            <button
+              type="button"
+              className="cr-btn cr-btn-primary"
+              onClick={guardarRuta}
+              disabled={ocupado}
+            >
+              {guardandoRuta ? 'GUARDANDO…' : rutaEnEdicion ? 'GUARDAR CAMBIOS' : 'GUARDAR RUTA'}
+            </button>
+            <button
+              type="button"
+              className="cr-btn cr-btn-secondary"
+              onClick={previsualizarRutaReal}
+              disabled={ocupado || puntosRuta.length < 3}
+              title="Dibuja el recorrido real por calles (no guarda nada ni requiere conductor)"
+            >
+              {previsualizando ? 'Previsualizando…' : 'Previsualizar ruta real'}
+            </button>
+            {rutaEnEdicion && onCancelarEdicion && (
+              <button
+                type="button"
+                className="cr-btn cr-btn-ghost"
+                onClick={onCancelarEdicion}
+                disabled={ocupado}
+              >
+                Cancelar edición
+              </button>
+            )}
+          </div>
+        </aside>
+
+        <div className="crear-ruta-mapa">
+          <MapaSuchiapa
+            camiones={[]}
+            seleccionable
+            puntos={coordenadas}
+            trazaReal={trazaReal ?? undefined}
+            onAgregarPunto={agregarPuntoRuta}
           />
-          <select
-            className="crear-ruta-conductor"
-            value={conductorSeleccionado ?? ''}
-            onChange={(e) => setConductorSeleccionado(e.target.value ? Number(e.target.value) : null)}
-            disabled={!!rutaEnEdicion}
-          >
-            <option value="">Selecciona conductor</option>
-            {conductores.map((c) => (
-              <option key={c.id} value={c.id}>{c.nombre}</option>
-            ))}
-          </select>
-          <span className="crear-ruta-contador">
-            {puntosRuta.length - 1} punto{puntosRuta.length - 1 === 1 ? '' : 's'}
-          </span>
           <button
             type="button"
-            className="pager-btn"
-            onClick={() => setPuntosRuta((prev) => prev.slice(0, -1))}
-            disabled={puntosRuta.length <= 1}
+            className="cr-map-undo"
+            onClick={() => {
+              setTrazaReal(null);
+              setPuntosRuta((prev) => prev.slice(0, -1));
+            }}
+            disabled={puntosRuta.length <= 1 || ocupado}
           >
-            Deshacer
+            <FiCornerUpLeft aria-hidden /> Deshacer
           </button>
-          <button type="button" className="pager-btn" onClick={guardarRuta} disabled={guardandoRuta}>
-            {guardandoRuta ? 'Guardando...' : rutaEnEdicion ? 'Guardar cambios' : 'Guardar ruta'}
-          </button>
-          {rutaEnEdicion && onCancelarEdicion && (
-            <button type="button" className="pager-btn" onClick={onCancelarEdicion} disabled={guardandoRuta}>
-              Cancelar
-            </button>
-          )}
         </div>
-      </header>
-
-      {errorRuta && <p className="crear-ruta-error">{errorRuta}</p>}
-
-      <div className="crear-ruta-mapa">
-        <MapaSuchiapa
-          camiones={[]}
-          seleccionable
-          puntos={coordenadas}
-          onAgregarPunto={agregarPuntoRuta}
-        />
       </div>
-
-      {puntosRuta.length > 1 && (
-        <ol className="crear-ruta-lista">
-          {puntosRuta.map((p, i) => (
-            <li key={`${p.lat}-${p.lng}-${i}`}>
-              <strong>{i === 0 ? 'Base' : i}.</strong> {p.direccion}
-              <span className="crear-ruta-coords">
-                ({p.lat.toFixed(5)}, {p.lng.toFixed(5)})
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
     </section>
   );
 }
