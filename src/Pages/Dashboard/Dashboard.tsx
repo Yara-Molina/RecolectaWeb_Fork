@@ -164,6 +164,9 @@ export default function Dashboard() {
   // Interacción de la leyenda: resaltar al pasar el cursor, encuadrar al pulsar.
   const [rutaResaltadaId, setRutaResaltadaId] = useState<number | null>(null);
   const [rutaEnfocadaId, setRutaEnfocadaId] = useState<number | null>(null);
+  // Cuando tiene valor, en el mapa se muestra SOLO esa ruta y se ocultan las
+  // demás. `null` = se muestran todas.
+  const [rutaSoloId, setRutaSoloId] = useState<number | null>(null);
 
   // Se resuelve aquí y no al cargar las rutas porque la lista de conductores
   // puede llegar después: así la leyenda se completa sola cuando lo haga.
@@ -176,6 +179,23 @@ export default function Dashboard() {
       })),
     [rutasActivasMapa, conductores],
   );
+
+  // Rutas que realmente se dibujan: todas, o solo la seleccionada.
+  const rutasParaMapa = useMemo(
+    () =>
+      rutaSoloId == null
+        ? rutasActivasConConductor
+        : rutasActivasConConductor.filter((r) => r.ruta_id === rutaSoloId),
+    [rutasActivasConConductor, rutaSoloId],
+  );
+
+  // Si la ruta aislada desaparece (se desactiva o deja de estar activa), se
+  // vuelve a mostrar todo para no dejar el mapa vacío sin explicación.
+  useEffect(() => {
+    if (rutaSoloId != null && !rutasActivasConConductor.some((r) => r.ruta_id === rutaSoloId)) {
+      setRutaSoloId(null);
+    }
+  }, [rutasActivasConConductor, rutaSoloId]);
 
   const { conductores: conductoresEnVivo, conectado: wsConectado } = useTrackingWS();
 
@@ -443,7 +463,7 @@ return (
               <MapaSuchiapa
                 camiones={camionesMapa}
                 conductoresEnVivo={conductoresEnVivo}
-                rutasActivas={rutasActivasConConductor}
+                rutasActivas={rutasParaMapa}
                 rutaResaltadaId={rutaResaltadaId}
                 rutaEnfocadaId={rutaEnfocadaId}
               />
@@ -451,19 +471,45 @@ return (
 
             {rutasActivasConConductor.length > 0 && (
               <ul className="mapa-leyenda">
+                {rutaSoloId != null && (
+                  <li>
+                    <button
+                      type="button"
+                      className="mapa-leyenda-todas"
+                      onClick={() => {
+                        setRutaSoloId(null);
+                        setRutaEnfocadaId(null);
+                      }}
+                    >
+                      ← Ver todas las rutas
+                    </button>
+                  </li>
+                )}
                 {rutasActivasConConductor.map((ruta) => (
                   <li key={`leyenda-${ruta.ruta_id}`}>
                     <button
                       type="button"
                       className={`mapa-leyenda-item${
                         rutaResaltadaId === ruta.ruta_id ? ' mapa-leyenda-item--activa' : ''
+                      }${rutaSoloId === ruta.ruta_id ? ' mapa-leyenda-item--sola' : ''}${
+                        rutaSoloId != null && rutaSoloId !== ruta.ruta_id ? ' mapa-leyenda-item--atenuada' : ''
                       }`}
                       onMouseEnter={() => setRutaResaltadaId(ruta.ruta_id)}
                       onMouseLeave={() => setRutaResaltadaId(null)}
                       onFocus={() => setRutaResaltadaId(ruta.ruta_id)}
                       onBlur={() => setRutaResaltadaId(null)}
-                      onClick={() => setRutaEnfocadaId(ruta.ruta_id)}
-                      title={`Centrar el mapa en ${ruta.nombre}`}
+                      onClick={() => {
+                        // Alterna: seleccionar aísla esta ruta; volver a pulsarla
+                        // muestra de nuevo todas.
+                        const aislar = rutaSoloId !== ruta.ruta_id;
+                        setRutaSoloId(aislar ? ruta.ruta_id : null);
+                        setRutaEnfocadaId(aislar ? ruta.ruta_id : null);
+                      }}
+                      title={
+                        rutaSoloId === ruta.ruta_id
+                          ? 'Mostrar todas las rutas'
+                          : `Mostrar solo ${ruta.nombre}`
+                      }
                     >
                       <span
                         className="mapa-leyenda-color"

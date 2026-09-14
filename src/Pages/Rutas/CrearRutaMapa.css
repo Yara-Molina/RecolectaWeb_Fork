@@ -7,7 +7,13 @@
 
 .crear-ruta-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 30%) 1fr;
+  /* Barra lateral de ancho fijo: el mapa se queda con todo el resto del ancho.
+     minmax(0, 1fr) evita que Leaflet desborde su columna. */
+  grid-template-columns: 300px minmax(0, 1fr);
+  /* min-height (no height fija): el contenedor crece lo justo para contener los
+     botones sin recortarlos. La lista de puntos, con su tope de altura y scroll
+     propio, mantiene la barra lateral a un tamaño constante al agregar puntos,
+     así los botones no se mueven ni se hunden. */
   min-height: 560px;
   background: #ffffff;
   border: 1px solid #e6ebe8;
@@ -30,6 +36,9 @@
 
 .cr-sidebar-scroll {
   flex: 1;
+  /* min-height: 0 permite que este hijo flex se encoja y active su scroll en
+     lugar de crecer y empujar los botones. */
+  min-height: 0;
   overflow-y: auto;
   padding: 22px 20px 8px;
 }
@@ -150,6 +159,20 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  /* Altura fija con scroll propio: al agregar más puntos la lista no crece ni
+     empuja los botones de guardar/previsualizar hacia abajo. */
+  max-height: 168px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.cr-points::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cr-points::-webkit-scrollbar-thumb {
+  background: #cbd5d0;
+  border-radius: 3px;
 }
 
 .cr-point {
@@ -193,6 +216,8 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* Nunca se comprime: los botones se muestran completos siempre. */
+  flex-shrink: 0;
 }
 
 .cr-btn {
