@@ -350,6 +350,60 @@
   cursor: not-allowed;
 }
 
+/* --- Programacion del servicio (dias / frecuencia / turno) --- */
+
+.cr-field-label {
+  display: block;
+  margin: 12px 0 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #4a5568;
+}
+
+.cr-field-hint {
+  margin: 6px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: #718096;
+}
+
+.cr-dias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cr-dia {
+  flex: 1 1 auto;
+  min-width: 44px;
+  padding: 8px 6px;
+  border: 1px solid #d8e0dd;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #4a5568;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.cr-dia:hover {
+  border-color: #0F676C;
+}
+
+.cr-dia--activo {
+  background: #0F676C;
+  border-color: #0F676C;
+  color: #ffffff;
+}
+
+.cr-dia:focus-visible {
+  outline: none;
+  border-color: #0F676C;
+  box-shadow: 0 0 0 3px rgba(15, 103, 108, 0.15);
+}
+
 /* --- Responsivo: apilar en pantallas estrechas --- */
 
 @media (max-width: 760px) {

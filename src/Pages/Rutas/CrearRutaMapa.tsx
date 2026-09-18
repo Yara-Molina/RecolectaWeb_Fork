@@ -54,8 +54,29 @@ export interface RutaEnEdicion {
   ruta_id: number;
   nombre: string;
   conductor_id: number | null;
+  dias_recoleccion?: string[] | null;
+  frecuencia_semanal?: number | null;
+  turno?: string | null;
   puntos: Array<{ lat: number; lng: number; nombre?: string; direccion?: string; cp?: string | null }>;
 }
+
+// Programacion de la ruta. Las claves son las que valida api_rutas (minuscula
+// y sin acentos); la etiqueta es solo para mostrar.
+const DIAS_SEMANA = [
+  { clave: 'lunes', etiqueta: 'Lunes' },
+  { clave: 'martes', etiqueta: 'Martes' },
+  { clave: 'miercoles', etiqueta: 'Miercoles' },
+  { clave: 'jueves', etiqueta: 'Jueves' },
+  { clave: 'viernes', etiqueta: 'Viernes' },
+  { clave: 'sabado', etiqueta: 'Sabado' },
+  { clave: 'domingo', etiqueta: 'Domingo' },
+] as const;
+
+const TURNOS = [
+  { clave: 'matutino', etiqueta: 'Matutino (08:00 - 10:00)' },
+  { clave: 'vespertino', etiqueta: 'Vespertino (14:00 - 16:00)' },
+  { clave: 'nocturno', etiqueta: 'Nocturno (20:00 - 22:00)' },
+] as const;
 
 export default function CrearRutaMapa({
   onRutaCreada,
@@ -69,6 +90,13 @@ export default function CrearRutaMapa({
 }) {
   const [puntosRuta, setPuntosRuta] = useState<PuntoRuta[]>([BASE_INICIO]);
   const [nombreRutaNueva, setNombreRutaNueva] = useState('');
+  const [diasRecoleccion, setDiasRecoleccion] = useState<string[]>([]);
+  // Se sincroniza con el numero de dias marcados mientras el administrador no
+  // la toque: lo normal es una pasada por dia, pero una ruta puede recorrerse
+  // dos veces el mismo dia y entonces se ajusta a mano.
+  const [frecuenciaSemanal, setFrecuenciaSemanal] = useState<number | null>(null);
+  const [frecuenciaManual, setFrecuenciaManual] = useState(false);
+  const [turno, setTurno] = useState('');
   const [conductorSeleccionado, setConductorSeleccionado] = useState<number | null>(null);
   const [guardandoRuta, setGuardandoRuta] = useState(false);
   const [errorRuta, setErrorRuta] = useState<string | null>(null);
@@ -98,6 +126,15 @@ export default function CrearRutaMapa({
     }
     setNombreRutaNueva(rutaEnEdicion.nombre);
     setConductorSeleccionado(rutaEnEdicion.conductor_id);
+    setDiasRecoleccion(rutaEnEdicion.dias_recoleccion ?? []);
+    setFrecuenciaSemanal(rutaEnEdicion.frecuencia_semanal ?? null);
+    // Si la ruta ya trae una frecuencia distinta del numero de dias, se
+    // respeta: la puso alguien a proposito.
+    setFrecuenciaManual(
+      rutaEnEdicion.frecuencia_semanal != null &&
+        rutaEnEdicion.frecuencia_semanal !== (rutaEnEdicion.dias_recoleccion?.length ?? 0),
+    );
+    setTurno(rutaEnEdicion.turno ?? '');
     setErrorRuta(null);
     setPuntosRuta([
       BASE_INICIO,
@@ -142,8 +179,32 @@ export default function CrearRutaMapa({
     setPuntosRuta([BASE_INICIO]);
     setNombreRutaNueva('');
     setConductorSeleccionado(null);
+    setDiasRecoleccion([]);
+    setFrecuenciaSemanal(null);
+    setFrecuenciaManual(false);
+    setTurno('');
     setErrorRuta(null);
     setTrazaReal(null);
+  };
+
+  const alternarDia = (clave: string) => {
+    setDiasRecoleccion((previos) => {
+      const siguientes = previos.includes(clave)
+        ? previos.filter((d) => d !== clave)
+        : [...previos, clave];
+
+      // Orden de la semana: se guarda asi y se lee mejor en el resumen.
+      siguientes.sort(
+        (a, b) =>
+          DIAS_SEMANA.findIndex((d) => d.clave === a) -
+          DIAS_SEMANA.findIndex((d) => d.clave === b),
+      );
+
+      if (!frecuenciaManual) {
+        setFrecuenciaSemanal(siguientes.length > 0 ? siguientes.length : null);
+      }
+      return siguientes;
+    });
   };
 
   const agregarPuntoRuta = async (punto: [number, number]) => {
@@ -335,6 +396,9 @@ export default function CrearRutaMapa({
           body: JSON.stringify({
             descripcion: `Ruta editada desde el dashboard con ${puntosRuta.length - 1} puntos. Asignada a ${conductorNombre}.`,
             json_ruta: jsonRuta,
+            dias_recoleccion: diasRecoleccion,
+            frecuencia_semanal: frecuenciaSemanal,
+            turno: turno || null,
           }),
         });
 
@@ -359,6 +423,9 @@ export default function CrearRutaMapa({
             descripcion: `Ruta creada desde el dashboard con ${puntosRuta.length - 1} puntos. Asignada a ${conductorNombre}.`,
             conductor_id: conductorSeleccionado,
             json_ruta: jsonRuta,
+            dias_recoleccion: diasRecoleccion,
+            frecuencia_semanal: frecuenciaSemanal,
+            turno: turno || null,
           }),
         });
         rutaId = rutaResponse.data.ruta_id;
@@ -495,6 +562,74 @@ export default function CrearRutaMapa({
 
             <div className="cr-step">
               <span className="cr-step-num">3</span>
+              <span className="cr-step-label">Programacion del servicio</span>
+            </div>
+            <p className="cr-field-hint">
+              Es lo que ve el ciudadano en su perfil: que dias pasa el camion y
+              en que horario.
+            </p>
+
+            <span className="cr-field-label">Dias de recoleccion</span>
+            <div className="cr-dias">
+              {DIAS_SEMANA.map((dia) => {
+                const activo = diasRecoleccion.includes(dia.clave);
+                return (
+                  <button
+                    key={dia.clave}
+                    type="button"
+                    className={`cr-dia${activo ? ' cr-dia--activo' : ''}`}
+                    aria-pressed={activo}
+                    onClick={() => alternarDia(dia.clave)}
+                  >
+                    {dia.etiqueta.slice(0, 3)}
+                  </button>
+                );
+              })}
+            </div>
+
+            <span className="cr-field-label">Veces por semana</span>
+            <input
+              className="cr-input"
+              type="number"
+              min={1}
+              max={7}
+              placeholder="Sin definir"
+              value={frecuenciaSemanal ?? ''}
+              onChange={(e) => {
+                const valor = e.target.value;
+                // Al escribirla a mano deja de seguir al numero de dias.
+                setFrecuenciaManual(valor !== '');
+                setFrecuenciaSemanal(valor === '' ? null : Number(valor));
+              }}
+            />
+            {frecuenciaSemanal != null &&
+              diasRecoleccion.length > 0 &&
+              frecuenciaSemanal !== diasRecoleccion.length && (
+                <p className="cr-field-hint">
+                  Marcaste {diasRecoleccion.length} dia
+                  {diasRecoleccion.length === 1 ? '' : 's'} pero la frecuencia
+                  dice {frecuenciaSemanal}. Es valido si la ruta se recorre mas
+                  de una vez el mismo dia.
+                </p>
+              )}
+
+            <span className="cr-field-label">Turno</span>
+            <div className="cr-select-wrap">
+              <select
+                className="cr-select"
+                value={turno}
+                onChange={(e) => setTurno(e.target.value)}
+              >
+                <option value="">Sin definir</option>
+                {TURNOS.map((t) => (
+                  <option key={t.clave} value={t.clave}>{t.etiqueta}</option>
+                ))}
+              </select>
+              <FiChevronDown className="cr-select-chevron" aria-hidden />
+            </div>
+
+            <div className="cr-step">
+              <span className="cr-step-num">4</span>
               <span className="cr-step-label">Marca los puntos en el mapa</span>
             </div>
             <span className="cr-badge">

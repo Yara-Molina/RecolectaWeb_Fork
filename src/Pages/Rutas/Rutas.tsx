@@ -14,7 +14,40 @@ interface RutaItem {
   // Lo devuelve api_rutas: JSON con la geometria y los puntos. Llega como
   // objeto o como cadena segun el driver de MySQL, de ahi el union.
   json_ruta: string | { puntos?: unknown[] } | null;
+  // Programacion que ve el ciudadano en la app. api_rutas devuelve
+  // dias_recoleccion ya normalizado a arreglo.
+  dias_recoleccion?: string[] | null;
+  frecuencia_semanal?: number | null;
+  turno?: string | null;
   created_at: string;
+}
+
+const ABREVIATURA_DIA: Record<string, string> = {
+  lunes: 'Lun',
+  martes: 'Mar',
+  miercoles: 'Mie',
+  jueves: 'Jue',
+  viernes: 'Vie',
+  sabado: 'Sab',
+  domingo: 'Dom',
+};
+
+/** Resumen corto de la programacion para el listado. */
+function resumenProgramacion(ruta: RutaItem): string | null {
+  const partes: string[] = [];
+
+  const dias = ruta.dias_recoleccion ?? [];
+  if (dias.length > 0) {
+    partes.push(dias.map((d) => ABREVIATURA_DIA[d] ?? d).join(', '));
+  }
+  if (ruta.frecuencia_semanal) {
+    partes.push(`${ruta.frecuencia_semanal}x por semana`);
+  }
+  if (ruta.turno) {
+    partes.push(ruta.turno);
+  }
+
+  return partes.length > 0 ? partes.join(' · ') : null;
 }
 
 export default function Rutas() {
@@ -82,6 +115,9 @@ export default function Rutas() {
         ruta_id: ruta.ruta_id,
         nombre: ruta.nombre,
         conductor_id: ruta.conductor_id,
+        dias_recoleccion: ruta.dias_recoleccion ?? null,
+        frecuencia_semanal: ruta.frecuencia_semanal ?? null,
+        turno: ruta.turno ?? null,
         puntos,
       });
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -152,6 +188,9 @@ export default function Rutas() {
                 <div className="ruta-item-left">
                   <span className="ruta-nombre">{ruta.nombre}</span>
                   {ruta.descripcion && <span className="ruta-desc">{ruta.descripcion}</span>}
+                  <span className="ruta-programacion">
+                    {resumenProgramacion(ruta) ?? 'Sin programacion asignada'}
+                  </span>
                 </div>
                 <div className="ruta-item-right">
                   <span className={`ruta-estado ${esActiva(ruta) ? 'ruta-estado--activa' : ''}`}>

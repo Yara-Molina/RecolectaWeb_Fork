@@ -193,3 +193,12 @@
   background: #f7e7e3;
   color: #E24B4A;
 }
+
+/* Programacion del servicio en el listado (dias / frecuencia / turno). */
+.ruta-programacion {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: #718096;
+  text-transform: capitalize;
+}
