@@ -67,15 +67,30 @@ export interface RutaEnEdicion {
   }>;
 }
 
+// `plural` sirve para el resumen ("Pasa los lunes y sábados"): lunes a viernes
+// no cambian en plural, pero sábado y domingo sí.
 const DIAS_SEMANA = [
-  { clave: "lunes", etiqueta: "Lunes" },
-  { clave: "martes", etiqueta: "Martes" },
-  { clave: "miercoles", etiqueta: "Miercoles" },
-  { clave: "jueves", etiqueta: "Jueves" },
-  { clave: "viernes", etiqueta: "Viernes" },
-  { clave: "sabado", etiqueta: "Sabado" },
-  { clave: "domingo", etiqueta: "Domingo" },
+  { clave: "lunes", etiqueta: "Lunes", corta: "Lun", plural: "lunes" },
+  { clave: "martes", etiqueta: "Martes", corta: "Mar", plural: "martes" },
+  { clave: "miercoles", etiqueta: "Miércoles", corta: "Mié", plural: "miércoles" },
+  { clave: "jueves", etiqueta: "Jueves", corta: "Jue", plural: "jueves" },
+  { clave: "viernes", etiqueta: "Viernes", corta: "Vie", plural: "viernes" },
+  { clave: "sabado", etiqueta: "Sábado", corta: "Sáb", plural: "sábados" },
+  { clave: "domingo", etiqueta: "Domingo", corta: "Dom", plural: "domingos" },
 ] as const;
+
+/** "Pasa los lunes, miércoles y viernes" a partir de las claves marcadas. */
+function resumenDias(claves: string[]): string {
+  if (claves.length === 0) return "Aún no marcas ningún día.";
+  const nombres = claves.map(
+    (clave) => DIAS_SEMANA.find((d) => d.clave === clave)?.plural ?? clave,
+  );
+  const lista =
+    nombres.length === 1
+      ? nombres[0]
+      : `${nombres.slice(0, -1).join(", ")} y ${nombres[nombres.length - 1]}`;
+  return `Pasa los ${lista}`;
+}
 
 const TURNOS = [
   { clave: "matutino", etiqueta: "Matutino (08:00 - 10:00)" },
@@ -320,14 +335,14 @@ export default function CrearRutaMapa({
     }
 
     const faltantes: string[] = [];
-    if (diasRecoleccion.length === 0) faltantes.push("los dias de recoleccion");
+    if (diasRecoleccion.length === 0) faltantes.push("los días de recolección");
     if (frecuenciaSemanal == null) faltantes.push("la frecuencia semanal");
 
     if (faltantes.length > 0) {
       const continuar = await confirmar(
-        "Falta la programacion del servicio",
-        `No indicaste ${faltantes.join(" ni ")}. En la app, el ciudadano vera "Por definir" en esos datos.`,
-        "Guardar asi",
+        "Falta la programación del servicio",
+        `No indicaste ${faltantes.join(" ni ")}. En la app, el ciudadano verá "Por definir" en esos datos.`,
+        "Guardar así",
       );
       if (!continuar) return;
     }
@@ -550,7 +565,7 @@ export default function CrearRutaMapa({
             <p className="cr-sidebar-instr">
               {rutaEnEdicion
                 ? "Añade o quita puntos y ajusta la programación. El nombre y el conductor no se modifican aquí."
-                : "Sigue los pasos a continuación:"}
+                : "Sigue los pasos a continuación"}
             </p>
 
             <div className="cr-step">
@@ -559,7 +574,7 @@ export default function CrearRutaMapa({
             </div>
             <input
               className="cr-input"
-              placeholder="Nombre de la ruta"
+              placeholder="Ej. Ruta Centro — Lunes"
               value={nombreRutaNueva}
               onChange={(e) => setNombreRutaNueva(e.target.value)}
               disabled={!!rutaEnEdicion}
@@ -592,15 +607,20 @@ export default function CrearRutaMapa({
 
             <div className="cr-step">
               <span className="cr-step-num">3</span>
-              <span className="cr-step-label">Programacion del servicio</span>
+              <span className="cr-step-label">Programación del servicio</span>
             </div>
             <p className="cr-field-hint">
-              Es lo que ve el ciudadano en su perfil: que dias pasa el camion y
-              en que horario.
+              Es lo que ve el ciudadano en su perfil: qué días pasa el camión y
+              en qué horario.
             </p>
 
-            <span className="cr-field-label">Dias de recoleccion</span>
-            <div className="cr-dias">
+            <span className="cr-field-label">
+              Días de recolección
+              {diasRecoleccion.length === 0 && (
+                <span className="cr-field-falta" title="Sin definir" />
+              )}
+            </span>
+            <div className="cr-dias" role="group" aria-label="Días de recolección">
               {DIAS_SEMANA.map((dia) => {
                 const activo = diasRecoleccion.includes(dia.clave);
                 return (
@@ -609,108 +629,128 @@ export default function CrearRutaMapa({
                     type="button"
                     className={`cr-dia${activo ? " cr-dia--activo" : ""}`}
                     aria-pressed={activo}
+                    aria-label={dia.etiqueta}
                     onClick={() => alternarDia(dia.clave)}
                   >
-                    {dia.etiqueta.slice(0, 3)}
+                    {dia.corta}
                   </button>
                 );
               })}
             </div>
-
             <p
               className={
                 diasRecoleccion.length > 0 ? "cr-dias-resumen" : "cr-field-hint"
               }
             >
-              {diasRecoleccion.length > 0
-                ? `Pasa los ${diasRecoleccion
-                    .map(
-                      (clave) =>
-                        DIAS_SEMANA.find((d) => d.clave === clave)?.etiqueta ??
-                        clave,
-                    )
-                    .join(", ")}`
-                : "Aun no marcas ningun dia."}
+              {resumenDias(diasRecoleccion)}
             </p>
 
-            <span className="cr-field-label">Veces por semana</span>
-            <input
-              className="cr-input"
-              type="number"
-              min={1}
-              max={7}
-              placeholder="Sin definir"
-              value={frecuenciaSemanal ?? ""}
-              onChange={(e) => {
-                const valor = e.target.value;
-                // Al escribirla a mano deja de seguir al numero de dias.
-                setFrecuenciaManual(valor !== "");
-                setFrecuenciaSemanal(valor === "" ? null : Number(valor));
-              }}
-            />
+            {/* Frecuencia y turno en la misma fila: son datos cortos y asi el
+                paso 4 queda a la vista sin desplazar la barra lateral. */}
+            <div className="cr-field-row">
+              <label className="cr-field">
+                <span className="cr-field-label">
+                  Veces por semana
+                  {frecuenciaSemanal == null && (
+                    <span className="cr-field-falta" title="Sin definir" />
+                  )}
+                </span>
+                <input
+                  className={`cr-input${frecuenciaSemanal == null ? " cr-input--falta" : ""}`}
+                  type="number"
+                  min={1}
+                  max={7}
+                  placeholder="—"
+                  value={frecuenciaSemanal ?? ""}
+                  onChange={(e) => {
+                    const valor = e.target.value;
+                    // Al escribirla a mano deja de seguir al numero de dias.
+                    setFrecuenciaManual(valor !== "");
+                    setFrecuenciaSemanal(valor === "" ? null : Number(valor));
+                  }}
+                />
+              </label>
+
+              <label className="cr-field">
+                <span className="cr-field-label">
+                  Turno
+                  {!turno && <span className="cr-field-falta" title="Sin definir" />}
+                </span>
+                <div className="cr-select-wrap">
+                  <select
+                    className={`cr-select${!turno ? " cr-select--falta" : ""}`}
+                    value={turno}
+                    onChange={(e) => setTurno(e.target.value)}
+                  >
+                    <option value="">Sin definir</option>
+                    {TURNOS.map((t) => (
+                      <option key={t.clave} value={t.clave}>
+                        {t.etiqueta}
+                      </option>
+                    ))}
+                  </select>
+                  <FiChevronDown className="cr-select-chevron" aria-hidden />
+                </div>
+              </label>
+            </div>
+
             {frecuenciaSemanal != null &&
               diasRecoleccion.length > 0 &&
               frecuenciaSemanal !== diasRecoleccion.length && (
                 <p className="cr-field-hint">
-                  Marcaste {diasRecoleccion.length} dia
-                  {diasRecoleccion.length === 1 ? "" : "s"} pero la frecuencia
-                  dice {frecuenciaSemanal}. Es valido si la ruta se recorre mas
-                  de una vez el mismo dia.
+                  Marcaste {diasRecoleccion.length}{" "}
+                  {diasRecoleccion.length === 1 ? "día" : "días"} pero la
+                  frecuencia dice {frecuenciaSemanal}. Es válido si la ruta se
+                  recorre más de una vez el mismo día.
                 </p>
               )}
 
-            <span className="cr-field-label">Turno</span>
-            <div className="cr-select-wrap">
-              <select
-                className="cr-select"
-                value={turno}
-                onChange={(e) => setTurno(e.target.value)}
-              >
-                <option value="">Sin definir</option>
-                {TURNOS.map((t) => (
-                  <option key={t.clave} value={t.clave}>
-                    {t.etiqueta}
-                  </option>
-                ))}
-              </select>
-              <FiChevronDown className="cr-select-chevron" aria-hidden />
-            </div>
-
             {(diasRecoleccion.length === 0 || frecuenciaSemanal == null) && (
               <p className="cr-field-aviso">
-                Sin {diasRecoleccion.length === 0 ? "dias" : ""}
                 {diasRecoleccion.length === 0 && frecuenciaSemanal == null
-                  ? " ni "
-                  : ""}
-                {frecuenciaSemanal == null ? "frecuencia" : ""}, el ciudadano
-                vera "Por definir" en su perfil. Puedes guardar igual y
-                completarlo despues.
+                  ? "Sin días ni frecuencia"
+                  : diasRecoleccion.length === 0
+                    ? "Sin días"
+                    : "Sin frecuencia"}
+                , el ciudadano verá «Por definir» en su perfil. Puedes guardar
+                igual y completarlo después.
               </p>
             )}
 
             <div className="cr-step">
               <span className="cr-step-num">4</span>
               <span className="cr-step-label">Marca los puntos en el mapa</span>
+              <span className="cr-badge">
+                {numPuntos} punto{numPuntos === 1 ? "" : "s"}
+              </span>
             </div>
-            <span className="cr-badge">
-              {numPuntos} punto{numPuntos === 1 ? "" : "s"} agregado
-              {numPuntos === 1 ? "" : "s"}
-            </span>
 
-            {numPuntos > 0 && (
-              <ol className="cr-points">
-                {puntosRuta.map((p, i) => (
-                  <li key={`${p.lat}-${p.lng}-${i}`} className="cr-point">
-                    <span className="cr-point-num">{i === 0 ? "B" : i}</span>
-                    <span className="cr-point-dir">{p.direccion}</span>
-                  </li>
-                ))}
-              </ol>
-            )}
+            <ol className="cr-points">
+              {puntosRuta.map((p, i) => (
+                <li
+                  key={`${p.lat}-${p.lng}-${i}`}
+                  className={`cr-point${i === 0 ? " cr-point--base" : ""}`}
+                >
+                  <span className="cr-point-num">{i === 0 ? "B" : i}</span>
+                  <span className="cr-point-dir">{p.direccion}</span>
+                </li>
+              ))}
+            </ol>
           </div>
 
           <div className="cr-actions">
             {errorRuta && <p className="crear-ruta-error">{errorRuta}</p>}
+            {/* Previsualizar va arriba y guardar abajo: la accion final queda
+                pegada al borde, donde termina el recorrido del formulario. */}
+            <button
+              type="button"
+              className="cr-btn cr-btn-secondary"
+              onClick={previsualizarRutaReal}
+              disabled={ocupado || puntosRuta.length < 3}
+              title="Dibuja el recorrido real por calles (no guarda nada ni requiere conductor)"
+            >
+              {previsualizando ? "Previsualizando…" : "Previsualizar ruta real"}
+            </button>
             <button
               type="button"
               className="cr-btn cr-btn-primary"
@@ -722,15 +762,6 @@ export default function CrearRutaMapa({
                 : rutaEnEdicion
                   ? "GUARDAR CAMBIOS"
                   : "GUARDAR RUTA"}
-            </button>
-            <button
-              type="button"
-              className="cr-btn cr-btn-secondary"
-              onClick={previsualizarRutaReal}
-              disabled={ocupado || puntosRuta.length < 3}
-              title="Dibuja el recorrido real por calles (no guarda nada ni requiere conductor)"
-            >
-              {previsualizando ? "Previsualizando…" : "Previsualizar ruta real"}
             </button>
             {rutaEnEdicion && onCancelarEdicion && (
               <button

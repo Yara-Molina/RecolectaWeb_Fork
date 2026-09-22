@@ -137,13 +137,14 @@
 
 .cr-badge {
   display: inline-block;
-  margin-top: 4px;
-  padding: 5px 12px;
+  margin-left: auto;
+  padding: 3px 10px;
   border-radius: 999px;
   background: #e6f2f2;
   color: #0f676c;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .cr-points {
@@ -244,12 +245,13 @@
 
 .cr-btn-secondary {
   background: #ffffff;
-  color: #0f676c;
-  border-color: #bcd6d6;
+  color: #2d3748;
+  border-color: #d8e0dd;
 }
 
 .cr-btn-secondary:not(:disabled):hover {
-  background: #f0f7f6;
+  background: #f5f7f6;
+  border-color: #bcd6d6;
 }
 
 .cr-btn-ghost {
@@ -347,10 +349,14 @@
 /* --- Programacion del servicio (dias / frecuencia / turno) --- */
 
 .cr-field-label {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 5px;
   margin: 12px 0 6px;
-  font-size: 0.76rem;
-  font-weight: 600;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   color: #4a5568;
 }
 
@@ -362,27 +368,23 @@
 }
 
 .cr-dias {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
 }
 
 .cr-dia {
-  flex: 1 1 auto;
-  min-width: 44px;
-  padding: 8px 6px;
+  min-width: 0;
+  padding: 7px 0;
   border: 1px solid #d8e0dd;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #ffffff;
   color: #4a5568;
   font-family: inherit;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .cr-dia:hover {
@@ -402,9 +404,9 @@
 }
 
 .cr-dias-resumen {
-  margin: 8px 0 0;
-  font-size: 0.75rem;
-  font-weight: 600;
+  margin: 6px 0 0;
+  font-size: 0.72rem;
+  font-weight: 500;
   color: #0f676c;
 }
 
@@ -420,6 +422,44 @@
   color: #7a5714;
 }
 
+
+
+/* Frecuencia y turno lado a lado. */
+.cr-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.cr-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cr-field-falta {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #e0891a;
+}
+
+.cr-input--falta,
+.cr-select--falta {
+  border-color: #efb66a;
+}
+
+.cr-point--base {
+  background: #eef6f6;
+  border-color: #a9cfcf;
+  color: #0f676c;
+}
+
+.cr-point--base .cr-point-num {
+  border-radius: 4px;
+  background: #0f676c;
+  color: #ffffff;
+}
 
 @media (max-width: 760px) {
   .crear-ruta-grid {
