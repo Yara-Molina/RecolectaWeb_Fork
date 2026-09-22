@@ -1,12 +1,20 @@
-import { MapContainer, TileLayer, Marker, Polyline, Tooltip, useMapEvents, useMap } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
-import { useEffect, useRef, Fragment } from 'react';
-import type { Coordenada } from './geo';
-import { SUCHIAPA_CENTER, SUCHIAPA_BOUNDS } from './constantes';
-import { colorRuta } from './coloresRuta';
-import type { EstadoCamionMapa } from './IconosCamion';
-import type { ConductorEnVivo } from '../../../hooks/useTrackingWS';
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Polyline,
+  Tooltip,
+  useMapEvents,
+  useMap,
+} from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+import { useEffect, useRef, Fragment } from "react";
+import type { Coordenada } from "./geo";
+import { SUCHIAPA_CENTER, SUCHIAPA_BOUNDS } from "./constantes";
+import { colorRuta } from "./coloresRuta";
+import type { EstadoCamionMapa } from "./IconosCamion";
+import type { ConductorEnVivo } from "../../../hooks/useTrackingWS";
 
 interface CamionMapa {
   id: string;
@@ -25,25 +33,27 @@ interface MapaSuchiapaProps {
     nombre: string;
     conductor_id: number | null;
     conductorNombre?: string;
-    /** Traza del AG: es lo que se dibuja como linea. */
     puntos: Coordenada[];
-    /** Puntos de recoleccion en su orden de visita, para numerarlos. */
-    paradas?: Array<{ orden: number; lat: number; lng: number; nombre?: string }>;
+    paradas?: Array<{
+      orden: number;
+      lat: number;
+      lng: number;
+      nombre?: string;
+    }>;
   }>;
-  /** Ruta sobre la que esta el cursor en la leyenda: se engrosa y las demas se atenuan. */
   rutaResaltadaId?: number | null;
-  /** Ruta a la que encuadrar el mapa al pulsarla en la leyenda. */
   rutaEnfocadaId?: number | null;
   seleccionable?: boolean;
   puntos?: Coordenada[];
-  /** Traza real del AG para la previsualizacion. Si falta, los puntos se unen
-   *  con lineas rectas: no se inventa una geometria por calles que no coincida
-   *  con la que seguira el conductor. */
   trazaReal?: Coordenada[];
   onAgregarPunto?: (punto: Coordenada) => void;
 }
 
-function ClickParaPuntos({ onAgregarPunto }: { onAgregarPunto: (punto: Coordenada) => void }) {
+function ClickParaPuntos({
+  onAgregarPunto,
+}: {
+  onAgregarPunto: (punto: Coordenada) => void;
+}) {
   useMapEvents({
     click(e) {
       onAgregarPunto([e.latlng.lat, e.latlng.lng]);
@@ -77,8 +87,6 @@ function AjustarTamaño() {
   return null;
 }
 
-/** Encuadra el mapa sobre una ruta. Se remonta al cambiar la ruta enfocada
- *  (via key), que es lo que dispara el ajuste. */
 function EnfocarRuta({ puntos }: { puntos: Coordenada[] }) {
   const map = useMap();
   useEffect(() => {
@@ -103,31 +111,26 @@ export default function MapaSuchiapa({
 }: MapaSuchiapaProps) {
   void camiones;
 
-  // Linea de la previsualizacion. Antes se pedia a OSRM (servidor publico), que
-  // dibujaba con su propio mapa de sentidos y en el orden de clic sin optimizar:
-  // rodeos y cruces que no coincidian con la ruta real del conductor, la cual
-  // sigue la geometria del AG. Ahora se dibuja esa traza real cuando existe; si
-  // aun no, los puntos unidos en orden (lineas rectas), sin geometria inventada.
-  const lineaPreview: Coordenada[] =
-    trazaReal && trazaReal.length >= 2 ? trazaReal : puntos;
+  const esTrazaReal = !!(trazaReal && trazaReal.length >= 2);
+  const lineaPreview: Coordenada[] = esTrazaReal
+    ? (trazaReal as Coordenada[])
+    : puntos;
 
-  // Marcador numerado de punto de recoleccion. Hereda el color de su ruta
-  // para que se sepa a cual pertenece cuando varias se cruzan.
   const iconoParada = (numero: number, color: string) =>
     L.divIcon({
       html:
         `<div style="background:${color};color:#fff;width:24px;height:24px;` +
-        'border-radius:50%;border:2px solid #fff;display:flex;align-items:center;' +
-        'justify-content:center;font:700 12px/1 system-ui,sans-serif;' +
+        "border-radius:50%;border:2px solid #fff;display:flex;align-items:center;" +
+        "justify-content:center;font:700 12px/1 system-ui,sans-serif;" +
         `box-shadow:0 1px 4px rgba(0,0,0,.35)">${numero}</div>`,
-      className: '',
+      className: "",
       iconSize: [24, 24],
       iconAnchor: [12, 12],
     });
 
   const truckIconFallback = L.divIcon({
     html: '<div style="font-size:40px;">🚛</div>',
-    className: '',
+    className: "",
     iconSize: [50, 50],
     iconAnchor: [25, 25],
   });
@@ -140,7 +143,7 @@ export default function MapaSuchiapa({
       maxZoom={19}
       maxBounds={SUCHIAPA_BOUNDS as [number, number][]}
       maxBoundsViscosity={1.0}
-      style={{ height: '100%', width: '100%' }}
+      style={{ height: "100%", width: "100%" }}
     >
       <TileLayer
         attribution="&copy; OpenStreetMap contributors"
@@ -149,37 +152,48 @@ export default function MapaSuchiapa({
 
       <AjustarTamaño />
 
-      {seleccionable && onAgregarPunto && <ClickParaPuntos onAgregarPunto={onAgregarPunto} />}
+      {seleccionable && onAgregarPunto && (
+        <ClickParaPuntos onAgregarPunto={onAgregarPunto} />
+      )}
 
       {puntos.map((punto, index) => (
         <Marker
           key={index}
           position={punto}
-          // El indice 0 es la base de la que salen los camiones; el resto se
-          // numera 1..N igual que en el listado de abajo.
-          icon={iconoParada(index, index === 0 ? '#0F676C' : '#1E88E5')}
+          icon={iconoParada(index, index === 0 ? "#0F676C" : "#1E88E5")}
         >
-          <Tooltip>{index === 0 ? 'Base de inicio' : `Punto ${index}`}</Tooltip>
+          <Tooltip>{index === 0 ? "Base de inicio" : `Punto ${index}`}</Tooltip>
         </Marker>
       ))}
 
       {lineaPreview.length >= 2 && (
-        <Polyline positions={lineaPreview} pathOptions={{ color: '#0F676C', weight: 4 }} />
+        <Polyline
+          positions={lineaPreview}
+          pathOptions={
+            esTrazaReal
+              ? { color: "#0F676C", weight: 4 }
+              : { color: "#0F676C", weight: 3, opacity: 0.5, dashArray: "6 8" }
+          }
+        />
       )}
 
       {rutaConductor && rutaConductor.length >= 2 && (
-        <Polyline positions={rutaConductor} pathOptions={{ color: '#E24B4A', weight: 4, opacity: 0.8 }} />
+        <Polyline
+          positions={rutaConductor}
+          pathOptions={{ color: "#E24B4A", weight: 4, opacity: 0.8 }}
+        />
       )}
 
       {rutaEnfocadaId != null && (
         <EnfocarRuta
           key={`enfoque-${rutaEnfocadaId}`}
-          puntos={rutasActivas.find((r) => r.ruta_id === rutaEnfocadaId)?.puntos ?? []}
+          puntos={
+            rutasActivas.find((r) => r.ruta_id === rutaEnfocadaId)?.puntos ?? []
+          }
         />
       )}
 
       {rutasActivas.map((ruta) => {
-        // Color estable por ruta_id (ver coloresRuta.ts), no por posición.
         const color = colorRuta(ruta.ruta_id);
         const resaltada = rutaResaltadaId === ruta.ruta_id;
         const hayResaltada = rutaResaltadaId != null;
@@ -189,14 +203,11 @@ export default function MapaSuchiapa({
             positions={ruta.puntos}
             pathOptions={{
               color,
-              // Atenuar las demas es lo que hace legible una ruta concreta
-              // cuando varias comparten calles.
               weight: resaltada ? 8 : 5,
               opacity: !hayResaltada || resaltada ? 0.9 : 0.2,
             }}
           >
-            {/* sticky: la etiqueta sigue al cursor a lo largo del trazo, que
-                es lo util cuando varias rutas se solapan en la misma calle. */}
+            {}
             <Tooltip sticky>
               <strong>{ruta.nombre}</strong>
               {ruta.conductorNombre ? <> · {ruta.conductorNombre}</> : null}
@@ -211,13 +222,15 @@ export default function MapaSuchiapa({
             key={`parada-${ruta.ruta_id}-${parada.orden}`}
             position={[parada.lat, parada.lng]}
             icon={iconoParada(parada.orden, colorRuta(ruta.ruta_id))}
-            // Atenuar las paradas de las rutas no resaltadas mantiene legible
-            // la que el usuario esta mirando en la leyenda.
-            opacity={rutaResaltadaId == null || rutaResaltadaId === ruta.ruta_id ? 1 : 0.25}
+            opacity={
+              rutaResaltadaId == null || rutaResaltadaId === ruta.ruta_id
+                ? 1
+                : 0.25
+            }
           >
             <Tooltip>
               <strong>
-                {parada.orden}. {parada.nombre || 'Punto de recoleccion'}
+                {parada.orden}. {parada.nombre || "Punto de recoleccion"}
               </strong>
               <br />
               {ruta.nombre}
@@ -229,12 +242,12 @@ export default function MapaSuchiapa({
       {conductoresEnVivo.map((c) => (
         <Fragment key={`conductor-group-${c.conductorId}`}>
           {c.recorrido && c.recorrido.length >= 2 && (
-            <Polyline positions={c.recorrido} pathOptions={{ color: '#FF6B35', weight: 5, opacity: 0.85 }} />
+            <Polyline
+              positions={c.recorrido}
+              pathOptions={{ color: "#FF6B35", weight: 5, opacity: 0.85 }}
+            />
           )}
-          <Marker
-            position={[c.lat, c.lng]}
-            icon={truckIconFallback}
-          />
+          <Marker position={[c.lat, c.lng]} icon={truckIconFallback} />
         </Fragment>
       ))}
     </MapContainer>

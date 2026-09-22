@@ -7,20 +7,14 @@
 
 .crear-ruta-grid {
   display: grid;
-  /* Barra lateral de ancho fijo: el mapa se queda con todo el resto del ancho.
-     minmax(0, 1fr) evita que Leaflet desborde su columna. */
   grid-template-columns: 300px minmax(0, 1fr);
-  /* min-height (no height fija): el contenedor crece lo justo para contener los
-     botones sin recortarlos. La lista de puntos, con su tope de altura y scroll
-     propio, mantiene la barra lateral a un tamaño constante al agregar puntos,
-     así los botones no se mueven ni se hunden. */
   min-height: 560px;
   background: #ffffff;
   border: 1px solid #e6ebe8;
   border-radius: 14px;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.10), 0 2px 4px -2px rgb(0 0 0 / 0.06);
-  /* Recorta el mapa a las esquinas del contenedor: Leaflet pinta sus tiles
-     fuera del radio si no se le acota aquí. */
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.1),
+    0 2px 4px -2px rgb(0 0 0 / 0.06);
   overflow: hidden;
 }
 
@@ -36,8 +30,6 @@
 
 .cr-sidebar-scroll {
   flex: 1;
-  /* min-height: 0 permite que este hijo flex se encoja y active su scroll en
-     lugar de crecer y empujar los botones. */
   min-height: 0;
   overflow-y: auto;
   padding: 22px 20px 8px;
@@ -74,7 +66,7 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: #0F676C;
+  background: #0f676c;
   color: #ffffff;
   font-size: 0.76rem;
   font-weight: 700;
@@ -99,7 +91,9 @@
   font-family: inherit;
   color: #2d3748;
   background: #ffffff;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .cr-input::placeholder {
@@ -109,7 +103,7 @@
 .cr-input:focus-visible,
 .cr-select:focus-visible {
   outline: none;
-  border-color: #0F676C;
+  border-color: #0f676c;
   box-shadow: 0 0 0 3px rgba(15, 103, 108, 0.15);
 }
 
@@ -147,7 +141,7 @@
   padding: 5px 12px;
   border-radius: 999px;
   background: #e6f2f2;
-  color: #0F676C;
+  color: #0f676c;
   font-size: 0.8rem;
   font-weight: 600;
 }
@@ -159,8 +153,6 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  /* Altura fija con scroll propio: al agregar más puntos la lista no crece ni
-     empuja los botones de guardar/previsualizar hacia abajo. */
   max-height: 168px;
   overflow-y: auto;
   padding-right: 4px;
@@ -193,7 +185,7 @@
   height: 18px;
   border-radius: 50%;
   background: #edf2f2;
-  color: #0F676C;
+  color: #0f676c;
   font-size: 0.7rem;
   font-weight: 700;
   display: flex;
@@ -216,7 +208,6 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  /* Nunca se comprime: los botones se muestran completos siempre. */
   flex-shrink: 0;
 }
 
@@ -229,7 +220,10 @@
   font-family: inherit;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .cr-btn:disabled {
@@ -238,7 +232,7 @@
 }
 
 .cr-btn-primary {
-  background: #0F676C;
+  background: #0f676c;
   color: #ffffff;
   letter-spacing: 0.03em;
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
@@ -250,7 +244,7 @@
 
 .cr-btn-secondary {
   background: #ffffff;
-  color: #0F676C;
+  color: #0f676c;
   border-color: #bcd6d6;
 }
 
@@ -272,8 +266,8 @@
   margin: 0;
   padding: 9px 12px;
   border-radius: 8px;
-  background: #fdECEA;
-  color: #9A382A;
+  background: #fdecea;
+  color: #9a382a;
   font-size: 0.84rem;
   line-height: 1.4;
 }
@@ -292,7 +286,6 @@
   width: 100%;
 }
 
-/* Zoom de Leaflet (arriba a la izquierda), reestilizado minimalista. */
 .crear-ruta-mapa .leaflet-control-zoom {
   border: none;
   border-radius: 10px;
@@ -311,10 +304,9 @@
 
 .crear-ruta-mapa .leaflet-control-zoom a:hover {
   background: #f0f7f6;
-  color: #0F676C;
+  color: #0f676c;
 }
 
-/* Botón flotante "Deshacer" (arriba a la derecha, sobre el mapa). */
 .cr-map-undo {
   position: absolute;
   top: 12px;
@@ -333,7 +325,9 @@
   font-family: inherit;
   cursor: pointer;
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .cr-map-undo svg {
@@ -342,7 +336,7 @@
 
 .cr-map-undo:not(:disabled):hover {
   background: #f0f7f6;
-  color: #0F676C;
+  color: #0f676c;
 }
 
 .cr-map-undo:disabled {
@@ -385,26 +379,47 @@
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .cr-dia:hover {
-  border-color: #0F676C;
+  border-color: #0f676c;
 }
 
 .cr-dia--activo {
-  background: #0F676C;
-  border-color: #0F676C;
+  background: #0f676c;
+  border-color: #0f676c;
   color: #ffffff;
 }
 
 .cr-dia:focus-visible {
   outline: none;
-  border-color: #0F676C;
+  border-color: #0f676c;
   box-shadow: 0 0 0 3px rgba(15, 103, 108, 0.15);
 }
 
-/* --- Responsivo: apilar en pantallas estrechas --- */
+.cr-dias-resumen {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #0f676c;
+}
+
+.cr-field-aviso {
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  border: 1px solid #f2d7a8;
+  border-left: 3px solid #d98b1f;
+  border-radius: 8px;
+  background: #fdf6e9;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: #7a5714;
+}
+
 
 @media (max-width: 760px) {
   .crear-ruta-grid {

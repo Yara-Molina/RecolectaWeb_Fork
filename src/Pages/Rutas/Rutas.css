@@ -16,9 +16,7 @@
   font-size: 14px;
 }
 
-/* Panel del listado. Comparte lenguaje visual con el de creación (borde,
-   radio y fondo) para que la página se lea como dos bloques y no como un
-   mapa seguido de tarjetas sueltas. */
+
 .rutas-panel {
   background: #ffffff;
   border: 1px solid #dce5df;
@@ -49,14 +47,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Altura acotada con scroll propio: el listado crece con el uso y sin esto
-   empuja el resto de la página hasta perder el mapa de vista. */
 .rutas-list {
   display: flex;
   flex-direction: column;
   max-height: 380px;
   overflow-y: auto;
-  /* Espacio para la barra, para que no se solape con el botón de eliminar. */
   padding-right: 6px;
   scrollbar-width: thin;
   scrollbar-color: #c7d3ca transparent;
@@ -75,8 +70,6 @@
   background: transparent;
 }
 
-/* Filas separadas por una línea en vez de tarjetas independientes: dentro
-   del panel, las tarjetas anidadas competían visualmente con él. */
 .ruta-item {
   display: flex;
   align-items: center;
@@ -201,4 +194,10 @@
   font-size: 0.72rem;
   color: #718096;
   text-transform: capitalize;
+}
+
+.ruta-programacion--falta {
+  color: #9a6a12;
+  font-weight: 600;
+  text-transform: none;
 }

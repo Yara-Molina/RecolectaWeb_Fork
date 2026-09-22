@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react';
-import { FiTrash2, FiEdit2, FiPower } from 'react-icons/fi';
-import { apiRequest } from '../../services/api';
-import { confirmar, confirmarEliminacion, alertaError } from '../../util/alertas';
-import CrearRutaMapa, { type RutaEnEdicion } from './CrearRutaMapa';
-import './Rutas.css';
+import { useEffect, useState } from "react";
+import { FiTrash2, FiEdit2, FiPower } from "react-icons/fi";
+import { apiRequest } from "../../services/api";
+import {
+  confirmar,
+  confirmarEliminacion,
+  alertaError,
+} from "../../util/alertas";
+import CrearRutaMapa, { type RutaEnEdicion } from "./CrearRutaMapa";
+import "./Rutas.css";
 
 interface RutaItem {
   ruta_id: number;
@@ -11,11 +15,7 @@ interface RutaItem {
   descripcion: string;
   conductor_id: number | null;
   activa?: boolean | number;
-  // Lo devuelve api_rutas: JSON con la geometria y los puntos. Llega como
-  // objeto o como cadena segun el driver de MySQL, de ahi el union.
   json_ruta: string | { puntos?: unknown[] } | null;
-  // Programacion que ve el ciudadano en la app. api_rutas devuelve
-  // dias_recoleccion ya normalizado a arreglo.
   dias_recoleccion?: string[] | null;
   frecuencia_semanal?: number | null;
   turno?: string | null;
@@ -23,22 +23,21 @@ interface RutaItem {
 }
 
 const ABREVIATURA_DIA: Record<string, string> = {
-  lunes: 'Lun',
-  martes: 'Mar',
-  miercoles: 'Mie',
-  jueves: 'Jue',
-  viernes: 'Vie',
-  sabado: 'Sab',
-  domingo: 'Dom',
+  lunes: "Lun",
+  martes: "Mar",
+  miercoles: "Mie",
+  jueves: "Jue",
+  viernes: "Vie",
+  sabado: "Sab",
+  domingo: "Dom",
 };
 
-/** Resumen corto de la programacion para el listado. */
 function resumenProgramacion(ruta: RutaItem): string | null {
   const partes: string[] = [];
 
   const dias = ruta.dias_recoleccion ?? [];
   if (dias.length > 0) {
-    partes.push(dias.map((d) => ABREVIATURA_DIA[d] ?? d).join(', '));
+    partes.push(dias.map((d) => ABREVIATURA_DIA[d] ?? d).join(", "));
   }
   if (ruta.frecuencia_semanal) {
     partes.push(`${ruta.frecuencia_semanal}x por semana`);
@@ -47,28 +46,29 @@ function resumenProgramacion(ruta: RutaItem): string | null {
     partes.push(ruta.turno);
   }
 
-  return partes.length > 0 ? partes.join(' · ') : null;
+  return partes.length > 0 ? partes.join(" · ") : null;
 }
 
 export default function Rutas() {
   const [rutas, setRutas] = useState<RutaItem[]>([]);
-  const [rutaEnEdicion, setRutaEnEdicion] = useState<RutaEnEdicion | null>(null);
+  const [rutaEnEdicion, setRutaEnEdicion] = useState<RutaEnEdicion | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
 
   const cargarRutas = async () => {
     setLoading(true);
     try {
-      // Via gin-backend: valida el JWT y reenvia a api_rutas, que es el dueño
-      // de las rutas. Llamar a api_rutas directo no funciona -- solo escucha
-      // en la red interna.
-      const json = await apiRequest<RutaItem[] | { data: RutaItem[] }>('/api/rutas/');
+      const json = await apiRequest<RutaItem[] | { data: RutaItem[] }>(
+        "/api/rutas/",
+      );
       if (Array.isArray(json)) {
         setRutas(json);
       } else if (Array.isArray(json.data)) {
         setRutas(json.data);
       }
     } catch (err) {
-      console.error('Error cargando rutas:', err);
+      console.error("Error cargando rutas:", err);
     } finally {
       setLoading(false);
     }
@@ -78,38 +78,53 @@ export default function Rutas() {
     cargarRutas();
   }, []);
 
-  const esActiva = (ruta: RutaItem) => ruta.activa === true || ruta.activa === 1;
+  const esActiva = (ruta: RutaItem) =>
+    ruta.activa === true || ruta.activa === 1;
 
-  // Solo se permite desactivar: reactivar podria dejar dos rutas activas para
-  // el mismo conductor, que es justo lo que la restriccion evita.
   const desactivarRuta = async (ruta: RutaItem) => {
     const ok = await confirmar(
       `¿Desactivar "${ruta.nombre}"?`,
-      'El conductor dejara de verla en la app. Podras asignarle otra ruta despues.',
-      'Desactivar',
+      "El conductor dejara de verla en la app. Podras asignarle otra ruta despues.",
+      "Desactivar",
     );
     if (!ok) return;
     try {
       await apiRequest(`/api/rutas/${ruta.ruta_id}`, {
-        method: 'PUT',
+        method: "PUT",
         body: JSON.stringify({ activa: false }),
       });
       await cargarRutas();
     } catch (err) {
-      console.error('Error desactivando ruta:', err);
-      alertaError('No se pudo desactivar la ruta', 'Intentalo de nuevo en unos segundos.');
+      console.error("Error desactivando ruta:", err);
+      alertaError(
+        "No se pudo desactivar la ruta",
+        "Intentalo de nuevo en unos segundos.",
+      );
     }
   };
 
   const editarPuntos = async (ruta: RutaItem) => {
     try {
-      const res = await apiRequest<{ success: boolean; data: Array<{ lat: number; lon: number; nombre?: string; direccion?: string; cp?: string | null; es_inicio?: boolean | number }> }>(
-        `/api/puntos-recoleccion/ruta/${ruta.ruta_id}`,
-      );
-      // La base se reanade sola al entrar en edicion, asi que aqui se excluye.
+      const res = await apiRequest<{
+        success: boolean;
+        data: Array<{
+          lat: number;
+          lon: number;
+          nombre?: string;
+          direccion?: string;
+          cp?: string | null;
+          es_inicio?: boolean | number;
+        }>;
+      }>(`/api/puntos-recoleccion/ruta/${ruta.ruta_id}`);
       const puntos = (res.data ?? [])
         .filter((p) => !(p.es_inicio === true || p.es_inicio === 1))
-        .map((p) => ({ lat: p.lat, lng: p.lon, nombre: p.nombre, direccion: p.direccion, cp: p.cp }));
+        .map((p) => ({
+          lat: p.lat,
+          lng: p.lon,
+          nombre: p.nombre,
+          direccion: p.direccion,
+          cp: p.cp,
+        }));
 
       setRutaEnEdicion({
         ruta_id: ruta.ruta_id,
@@ -120,30 +135,36 @@ export default function Rutas() {
         turno: ruta.turno ?? null,
         puntos,
       });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
-      console.error('Error cargando puntos de la ruta:', err);
-      alertaError('No se pudieron cargar los puntos', 'Intentalo de nuevo en unos segundos.');
+      console.error("Error cargando puntos de la ruta:", err);
+      alertaError(
+        "No se pudieron cargar los puntos",
+        "Intentalo de nuevo en unos segundos.",
+      );
     }
   };
 
   const eliminarRuta = async (id: number) => {
     const ok = await confirmarEliminacion(
-      '¿Eliminar esta ruta?',
-      'Se borrarán también sus puntos de recolección. Esta acción no se puede deshacer.',
+      "¿Eliminar esta ruta?",
+      "Se borrarán también sus puntos de recolección. Esta acción no se puede deshacer.",
     );
     if (!ok) return;
     try {
-      await apiRequest(`/api/rutas/${id}`, { method: 'DELETE' });
-      setRutas(prev => prev.filter(r => r.ruta_id !== id));
+      await apiRequest(`/api/rutas/${id}`, { method: "DELETE" });
+      setRutas((prev) => prev.filter((r) => r.ruta_id !== id));
     } catch (err) {
-      console.error('Error eliminando ruta:', err);
+      console.error("Error eliminando ruta:", err);
     }
   };
 
   const contarPuntos = (ruta: RutaItem): number => {
     try {
-      const json = typeof ruta.json_ruta === 'string' ? JSON.parse(ruta.json_ruta) : ruta.json_ruta;
+      const json =
+        typeof ruta.json_ruta === "string"
+          ? JSON.parse(ruta.json_ruta)
+          : ruta.json_ruta;
       if (Array.isArray(json?.puntos)) return json.puntos.length;
       if (Array.isArray(json)) return json.length;
       return 0;
@@ -160,7 +181,6 @@ export default function Rutas() {
           <p>Crea rutas sobre el mapa y consulta las existentes</p>
         </header>
 
-        {/* Al crear una ruta se recarga el listado, para no dejarlo desfasado. */}
         <CrearRutaMapa
           onRutaCreada={() => {
             setRutaEnEdicion(null);
@@ -175,28 +195,42 @@ export default function Rutas() {
             <h2>Rutas creadas</h2>
             {!loading && rutas.length > 0 && (
               <span className="rutas-panel-contador">
-                {rutas.length} ruta{rutas.length === 1 ? '' : 's'}
+                {rutas.length} ruta{rutas.length === 1 ? "" : "s"}
               </span>
             )}
           </header>
 
           <div className="rutas-list">
             {loading && <p className="rutas-empty">Cargando rutas...</p>}
-            {!loading && rutas.length === 0 && <p className="rutas-empty">No hay rutas creadas aún.</p>}
-            {rutas.map(ruta => (
+            {!loading && rutas.length === 0 && (
+              <p className="rutas-empty">No hay rutas creadas aún.</p>
+            )}
+            {rutas.map((ruta) => (
               <div key={ruta.ruta_id} className="ruta-item">
                 <div className="ruta-item-left">
                   <span className="ruta-nombre">{ruta.nombre}</span>
-                  {ruta.descripcion && <span className="ruta-desc">{ruta.descripcion}</span>}
-                  <span className="ruta-programacion">
-                    {resumenProgramacion(ruta) ?? 'Sin programacion asignada'}
-                  </span>
+                  {ruta.descripcion && (
+                    <span className="ruta-desc">{ruta.descripcion}</span>
+                  )}
+                  {resumenProgramacion(ruta) ? (
+                    <span className="ruta-programacion">
+                      {resumenProgramacion(ruta)}
+                    </span>
+                  ) : (
+                    <span className="ruta-programacion ruta-programacion--falta">
+                      Falta programacion: dias y frecuencia
+                    </span>
+                  )}
                 </div>
                 <div className="ruta-item-right">
-                  <span className={`ruta-estado ${esActiva(ruta) ? 'ruta-estado--activa' : ''}`}>
-                    {esActiva(ruta) ? 'Activa' : 'Inactiva'}
+                  <span
+                    className={`ruta-estado ${esActiva(ruta) ? "ruta-estado--activa" : ""}`}
+                  >
+                    {esActiva(ruta) ? "Activa" : "Inactiva"}
                   </span>
-                  <span className="ruta-puntos">{contarPuntos(ruta)} puntos</span>
+                  <span className="ruta-puntos">
+                    {contarPuntos(ruta)} puntos
+                  </span>
                   <button
                     className="ruta-btn"
                     onClick={() => editarPuntos(ruta)}
