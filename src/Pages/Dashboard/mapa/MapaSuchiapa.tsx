@@ -11,7 +11,11 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect, useRef, Fragment } from "react";
 import type { Coordenada } from "./geo";
-import { SUCHIAPA_CENTER, SUCHIAPA_BOUNDS } from "./constantes";
+import {
+  SUCHIAPA_CENTER,
+  SUCHIAPA_BOUNDS,
+  LIMITAR_MAPA_A_SUCHIAPA,
+} from "./constantes";
 import { colorRuta } from "./coloresRuta";
 import type { EstadoCamionMapa } from "./IconosCamion";
 import type { ConductorEnVivo } from "../../../hooks/useTrackingWS";
@@ -139,10 +143,14 @@ export default function MapaSuchiapa({
     <MapContainer
       center={SUCHIAPA_CENTER}
       zoom={15}
-      minZoom={12}
+      minZoom={LIMITAR_MAPA_A_SUCHIAPA ? 12 : 3}
       maxZoom={19}
-      maxBounds={SUCHIAPA_BOUNDS as [number, number][]}
-      maxBoundsViscosity={1.0}
+      maxBounds={
+        LIMITAR_MAPA_A_SUCHIAPA
+          ? (SUCHIAPA_BOUNDS as [number, number][])
+          : undefined
+      }
+      maxBoundsViscosity={LIMITAR_MAPA_A_SUCHIAPA ? 1.0 : undefined}
       style={{ height: "100%", width: "100%" }}
     >
       <TileLayer
