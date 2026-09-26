@@ -1,0 +1,291 @@
+.estado-camiones-page {
+  --primary: #0F676C;
+  --primary-dark: #0a4a4e;
+  --success: #639922;
+  --warning: #E88D1D;
+  --danger: #E24B4A;
+  --muted: #8a9a90;
+  --bg-light: #f0f4f2;
+  --bg-card: #ffffff;
+  --text: #1a3a2f;
+  --text-light: #5a6e60;
+  --border: #dce5df;
+  --radius: 14px;
+  --shadow-sm: 0 2px 6px rgba(15, 103, 108, 0.08);
+  --shadow-md: 0 4px 12px rgba(15, 103, 108, 0.12);
+
+  background: var(--bg-light);
+  min-height: 100vh;
+  padding: 20px;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  position: relative;
+}
+
+.estado-camiones-page,
+.estado-camiones-page * {
+  box-sizing: border-box;
+}
+
+.estado-camiones-page button {
+  font: inherit;
+}
+
+.ec-header {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  border-radius: var(--radius);
+  padding: 24px 28px;
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  box-shadow: var(--shadow-md);
+}
+
+.ec-header h1 {
+  margin: 0 0 4px;
+  font-size: 1.6rem;
+}
+
+.ec-header p {
+  margin: 0;
+  opacity: 0.85;
+  font-size: 0.9rem;
+}
+
+.ec-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.ec-refresh:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.ec-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+
+.ec-stat {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  align-items: center;
+  text-align: left;
+  background: var(--bg-card);
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  color: var(--text);
+}
+
+.ec-stat.activo {
+  border-color: var(--primary);
+}
+
+.ec-stat-icon {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  font-size: 1.2rem;
+  color: #fff;
+}
+
+.ec-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.ec-stat-label {
+  color: var(--text-light);
+  font-size: 0.85rem;
+}
+
+.ec-en_ruta .ec-stat-icon { background: var(--success); }
+.ec-pausa .ec-stat-icon { background: var(--warning); }
+.ec-en_base .ec-stat-icon { background: var(--primary); }
+.ec-sin_reporte .ec-stat-icon { background: var(--muted); }
+
+.ec-error {
+  background: rgba(226, 75, 74, 0.1);
+  color: var(--danger);
+  border: 1px solid rgba(226, 75, 74, 0.3);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+
+.ec-tabla-contenedor {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+}
+
+.ec-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.ec-tabla th {
+  text-align: left;
+  color: var(--text-light);
+  font-weight: 600;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.ec-tabla td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.ec-tabla tbody tr {
+  cursor: pointer;
+}
+
+.ec-tabla tbody tr:hover,
+.ec-tabla tbody tr.seleccionado {
+  background: rgba(15, 103, 108, 0.06);
+}
+
+.ec-camion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ec-camion svg {
+  color: var(--primary);
+  font-size: 1.2rem;
+}
+
+.ec-camion span {
+  display: block;
+  color: var(--text-light);
+  font-size: 0.8rem;
+}
+
+.ec-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.ec-badge.ec-en_ruta { background: rgba(99, 153, 34, 0.15); color: var(--success); }
+.ec-badge.ec-pausa { background: rgba(232, 141, 29, 0.15); color: var(--warning); }
+.ec-badge.ec-en_base { background: rgba(15, 103, 108, 0.12); color: var(--primary); }
+.ec-badge.ec-sin_reporte { background: rgba(138, 154, 144, 0.18); color: var(--text-light); }
+
+.ec-flota {
+  color: var(--text-light);
+  font-size: 0.8rem;
+}
+
+.ec-vacio {
+  color: var(--text-light);
+  padding: 24px;
+  text-align: center;
+  margin: 0;
+}
+
+.ec-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(360px, 100%);
+  height: 100vh;
+  background: var(--bg-card);
+  box-shadow: -8px 0 24px rgba(15, 103, 108, 0.15);
+  padding: 20px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.ec-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.ec-panel-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.ec-panel-header span {
+  color: var(--text-light);
+  font-size: 0.85rem;
+}
+
+.ec-panel-header button {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  color: var(--text-light);
+  cursor: pointer;
+}
+
+.ec-historial {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 14px;
+  border-left: 2px solid var(--border);
+}
+
+.ec-historial li {
+  position: relative;
+  padding: 0 0 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ec-historial li::before {
+  content: "";
+  position: absolute;
+  left: -21px;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid var(--bg-card);
+}
+
+.ec-historial span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-light);
+  font-size: 0.85rem;
+}
+
+.ec-historial small {
+  color: var(--text-light);
+}

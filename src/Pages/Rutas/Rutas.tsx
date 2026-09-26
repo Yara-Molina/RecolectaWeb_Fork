@@ -117,10 +117,6 @@ export default function Rutas() {
           es_esquina?: boolean | number;
         }>;
       }>(`/api/puntos-recoleccion/ruta/${ruta.ruta_id}`);
-      // Este endpoint devuelve tambien los pasos de navegacion que el AG guarda
-      // al optimizar (es_esquina): esquinas y giros, no paradas. Si se cargan
-      // aqui, al guardar se recrean como paradas reales y la ruta queda con
-      // cada parada duplicada a pocos metros. La base se añade aparte.
       const puntos = (res.data ?? [])
         .filter((p) => !(p.es_inicio === true || p.es_inicio === 1))
         .filter((p) => !(p.es_esquina === true || p.es_esquina === 1))

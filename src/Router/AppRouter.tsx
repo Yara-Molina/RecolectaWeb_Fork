@@ -11,6 +11,7 @@ import Dashboard from "../Pages/Dashboard/Dashboard";
 import Historial from "../Pages/Historial/Historial";
 import Anomalias from "../Pages/Anomalias/Anomalias";
 import EstadoRuta from "../Pages/EstadoRuta/EstadoRuta";
+import EstadoCamiones from "../Pages/EstadoCamiones/EstadoCamiones";
 import Rutas from "../Pages/Rutas/Rutas";
 
 // Páginas sin conectar todavía (ver src/Pages/_inactive/README.md)
@@ -42,8 +43,7 @@ function AppLayout() {
 
 // El índice de /administracion no siempre puede ir a "rellenos": ese
 // apartado no es visible para todos los roles. Se manda a la primera
-// sub-sección que el rol de la cuenta sí puede ver (o a /dashboard si
-// no tiene acceso a ninguna).
+// sub-sección que el rol de la cuenta sí puede ver
 function AdministracionIndex() {
   const path = firstAccessibleAdminPath();
   return <Navigate to={path ?? "/dashboard"} replace />;
@@ -53,14 +53,13 @@ export default function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Ruta principal */}
         <Route path="/" element={<Navigate to="/login" replace />} />
 
         {/* Login sin navbar */}
         <Route path="/login" element={<Login />} />
 
         {/* ==========================
-            RUTAS CON NAVBAR (GLOBAL)
+            RUTAS CON NAVBAR
            ========================== */}
         <Route
           element={
@@ -85,6 +84,14 @@ export default function AppRouter() {
             element={
               <RequireRole section="anomalias">
                 <Anomalias />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/estado-camiones"
+            element={
+              <RequireRole section="estadoCamiones">
+                <EstadoCamiones />
               </RequireRole>
             }
           />
