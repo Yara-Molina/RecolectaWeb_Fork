@@ -39,6 +39,50 @@ interface Anomalia {
   subtipo_clasificado?: string | null;
   accion_sugerida?: string | null;
   pipeline_error?: string | null;
+  pipeline_intentos?: number;
+}
+
+const CATEGORIA_LEGIBLE: Record<string, string> = {
+  calle_tapada: 'Calle bloqueada',
+  basura_no_recolectable: 'Basura no recolectable',
+  vehiculo_o_contenedor_danado: 'Vehículo o contenedor dañado',
+  otro: 'Sin clasificar',
+};
+
+const ACCION_LEGIBLE: Record<string, string> = {
+  block_edge: 'Bloqueo total: conviene evitar esta calle',
+  inflate_weight: 'Paso difícil: la calle se puede usar con retraso',
+  marcar_mantenimiento: 'Requiere mantenimiento',
+};
+
+const MAX_INTENTOS_PIPELINE = 5;
+
+function subtipoLegible(subtipo?: string | null): string | null {
+  if (!subtipo) return null;
+  const gravedad = subtipo.startsWith('total') ? 'Cierre total' : subtipo.startsWith('parcial') ? 'Paso parcial' : null;
+  const duracion = subtipo.endsWith('en_reparacion') ? 'en reparación' : subtipo.endsWith('temporal') ? 'temporal' : null;
+  if (!gravedad && !duracion) return subtipo.replace(/_/g, ' ');
+  return [gravedad, duracion].filter(Boolean).join(' · ');
+}
+
+
+function estadoClasificacion(a: Anomalia): { texto: string; error: boolean } | null {
+  switch (a.estado_pipeline) {
+    case 'pendiente':
+    case 'procesando':
+      return { texto: 'Clasificando…', error: false };
+    case 'error': {
+      const intentos = a.pipeline_intentos ?? 0;
+      return {
+        texto: intentos >= MAX_INTENTOS_PIPELINE
+          ? 'No se pudo clasificar (sin más reintentos automáticos)'
+          : `No se pudo clasificar (intento ${intentos} de ${MAX_INTENTOS_PIPELINE})`,
+        error: true,
+      };
+    }
+    default:
+      return null;
+  }
 }
 
 interface AnomaliaPayload {
@@ -485,90 +529,65 @@ export default function Anomalias() {
                   </div>
                 </div>
 
-                {selectedAnomalia.estado_pipeline && (
-                  <div className="anomalias modal-section">
-                    <label className="anomalias modal-label">
-                      Clasificación automática
-                    </label>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexWrap: "wrap",
-                        gap: 8,
-                        fontSize: 13,
-                      }}
-                    >
-                      <span
+                {/*
+                  Clasificación automática. Se quitó el nivel de riesgo: mide si el
+                  texto parece fraude o spam (no la gravedad), y los de riesgo medio
+                  o alto ni siquiera llegan a esta lista (estado "rechazado"), así
+                  que siempre decía "bajo".
+                */}
+                {(() => {
+                  const estado = estadoClasificacion(selectedAnomalia);
+                  const categoria = selectedAnomalia.categoria_clasificada
+                    ? CATEGORIA_LEGIBLE[selectedAnomalia.categoria_clasificada] ??
+                      selectedAnomalia.categoria_clasificada.replace(/_/g, ' ')
+                    : null;
+                  const subtipo = subtipoLegible(selectedAnomalia.subtipo_clasificado);
+                  const accion = selectedAnomalia.accion_sugerida
+                    ? ACCION_LEGIBLE[selectedAnomalia.accion_sugerida] ?? null
+                    : null;
+                  if (!estado && !categoria && !accion) return null;
+
+                  const chip = { padding: "4px 10px", borderRadius: 12, background: "#f1f2f6" };
+                  return (
+                    <div className="anomalias modal-section">
+                      <label className="anomalias modal-label">
+                        Clasificación automática
+                      </label>
+                      <div
                         style={{
-                          padding: "4px 10px",
-                          borderRadius: 12,
-                          background: "#f1f2f6",
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 8,
+                          fontSize: 13,
                         }}
                       >
-                        Pipeline: {selectedAnomalia.estado_pipeline}
-                      </span>
-                      {selectedAnomalia.nivel_riesgo && (
-                        <span
-                          style={{
-                            padding: "4px 10px",
-                            borderRadius: 12,
-                            background:
-                              selectedAnomalia.nivel_riesgo === "alto"
-                                ? "#fdecea"
-                                : selectedAnomalia.nivel_riesgo === "medio"
-                                  ? "#fff4e0"
-                                  : "#eafaf1",
-                            color:
-                              selectedAnomalia.nivel_riesgo === "alto"
-                                ? "#e74c3c"
-                                : selectedAnomalia.nivel_riesgo === "medio"
-                                  ? "#c78a1e"
-                                  : "#27ae60",
-                          }}
-                        >
-                          Riesgo: {selectedAnomalia.nivel_riesgo}
-                        </span>
-                      )}
-                      {selectedAnomalia.categoria_clasificada && (
-                        <span
-                          style={{
-                            padding: "4px 10px",
-                            borderRadius: 12,
-                            background: "#f1f2f6",
-                          }}
-                        >
-                          Categoría: {selectedAnomalia.categoria_clasificada}
-                          {selectedAnomalia.subtipo_clasificado
-                            ? ` / ${selectedAnomalia.subtipo_clasificado}`
-                            : ""}
-                        </span>
-                      )}
-                      {selectedAnomalia.accion_sugerida && (
-                        <span
-                          style={{
-                            padding: "4px 10px",
-                            borderRadius: 12,
-                            background: "#f1f2f6",
-                          }}
-                        >
-                          Acción sugerida: {selectedAnomalia.accion_sugerida}
-                        </span>
-                      )}
-                      {selectedAnomalia.pipeline_error && (
-                        <span
-                          style={{
-                            padding: "4px 10px",
-                            borderRadius: 12,
-                            background: "#fdecea",
-                            color: "#e74c3c",
-                          }}
-                        >
-                          Error: {selectedAnomalia.pipeline_error}
-                        </span>
-                      )}
+                        {estado && (
+                          <span
+                            style={
+                              estado.error
+                                ? { ...chip, background: "#fdecea", color: "#e74c3c" }
+                                : chip
+                            }
+                            title={estado.error ? selectedAnomalia.pipeline_error ?? undefined : undefined}
+                          >
+                            {estado.texto}
+                          </span>
+                        )}
+                        {categoria && (
+                          <span style={chip}>
+                            {categoria}
+                            {subtipo ? ` · ${subtipo}` : ""}
+                          </span>
+                        )}
+                        {accion && (
+                          <span style={{ ...chip, background: "#fff4e0", color: "#8a5a00" }}>
+                            {accion}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 <div className="anomalias modal-section">
                   <label className="anomalias modal-label">
