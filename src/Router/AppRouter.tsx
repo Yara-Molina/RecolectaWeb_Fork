@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom
 
 import Login from "../Pages/Login/Login";
 import Navbar from "../components/Navigation/Navbar";
+import AvisoAnomalias from "../components/Notificaciones/AvisoAnomalias";
 import { RequireAuth, RequireRole } from "./Guards";
 import { firstAccessibleAdminPath } from "../services/auth";
 
@@ -19,7 +20,7 @@ import Alertas from "../Pages/_inactive/Alertas/Alertas";
 import ValidacionRecoleccion from "../Pages/_inactive/ValidacionRecoleccion/ValidacionRecoleccion";
 
 // ==========================
-// ADMINISTRACIÓN (NUEVO)
+// ADMINISTRACIÓN
 // ==========================
 
 import AdministracionLayout from "../Pages/Administracion/AdministracionLayout";
@@ -31,19 +32,16 @@ import DispositivosPage from "../Pages/Administracion/Dispositivos/DispositivosP
 // Sin conectar todavía (ver src/Pages/_inactive/README.md)
 import DiasRecoleccionPage from "../Pages/_inactive/DiasRecoleccion/DiasRecoleccionPage";
 
-// Layout global (Navbar + contenido)
 function AppLayout() {
   return (
     <>
       <Navbar />
       <Outlet />
+      <AvisoAnomalias />
     </>
   );
 }
 
-// El índice de /administracion no siempre puede ir a "rellenos": ese
-// apartado no es visible para todos los roles. Se manda a la primera
-// sub-sección que el rol de la cuenta sí puede ver
 function AdministracionIndex() {
   const path = firstAccessibleAdminPath();
   return <Navigate to={path ?? "/dashboard"} replace />;

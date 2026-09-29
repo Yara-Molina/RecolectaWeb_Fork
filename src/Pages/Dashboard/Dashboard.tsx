@@ -3,6 +3,8 @@ import { FiAlertTriangle } from 'react-icons/fi';
 import MapaSuchiapa, { type CamionMapa } from './mapa/MapaSuchiapa';
 import { colorRuta } from './mapa/coloresRuta';
 import { apiRequest } from '../../services/api';
+
+import { EVENTO_ANOMALIAS_ACTUALIZADAS } from '../../components/Notificaciones/AvisoAnomalias';
 import { ROLES } from '../../services/auth';
 import { useTrackingWS } from '../../hooks/useTrackingWS';
 import './Dashboard.css';
@@ -28,9 +30,6 @@ interface Ruta {
   badge: string;
 }
 
-// Catálogo mínimo de camiones para este dashboard (ver CamionesPage.tsx para
-// el modelo completo y ESTADOS_DISPONIBILIDAD). Solo lo que hace falta para
-// las métricas y la lista de camiones.
 interface CamionDashboard {
   camion_id: number;
   placa: string;
@@ -38,15 +37,12 @@ interface CamionDashboard {
   nombre_disponibilidad: string;
 }
 
-// Tal como responde GET /api/rutas/ (ver EstadoRuta.tsx). Nada que ver con la
-// interfaz "Ruta" ficticia del mini-mapa.
 interface RutaFiltro {
   ruta_id: number;
   nombre: string;
   eliminado: boolean;
 }
 
-// Tal como responde GET /api/ruta-camion/ (vínculo camión <-> ruta).
 interface RutaCamionLink {
   ruta_camion_id: number;
   ruta_id: number;
@@ -54,23 +50,17 @@ interface RutaCamionLink {
   eliminado: boolean;
 }
 
-// Tal como responde GET /api/historial-asignacion/ (ver Historial.tsx). Solo
-// lo necesario para saber qué conductor tiene asignado cada camión hoy.
 interface AsignacionActiva {
   id_camion: number;
   id_chofer: number;
   fecha_baja: string;
 }
 
-// Tal como responde GET /api/empleados/ (requiere rol ADMIN — ver
-// Historial.tsx). Si la cuenta logueada no es ADMIN este fetch falla y el
-// nombre del conductor simplemente se omite, sin bloquear el panel.
 interface ConductorDashboard {
   id: number;
   nombre: string;
 }
 
-// Tal como responde GET /api/registro-vaciado/.
 interface RegistroVaciadoDashboard {
   vaciado_id: number;
   relleno_id: number;
@@ -81,7 +71,7 @@ interface RegistroVaciadoDashboard {
 function estadoDeDisponibilidad(nombre: string): 'alerta' | 'advertencia' | 'ok' {
   if (nombre === 'OPERATIVO') return 'ok';
   if (nombre === 'MANTENIMIENTO') return 'advertencia';
-  return 'alerta'; // FUERA_SERVICIO, BAJA
+  return 'alerta';
 }
 
 function labelDisponibilidad(nombre: string): string {
@@ -94,15 +84,12 @@ function labelDisponibilidad(nombre: string): string {
   }
 }
 
-// ─── Datos simulados ──────────────────────────────────────────────────────────
-
 const RUTAS_INICIALES: Ruta[] = [
   { id: '01', nombre: 'Camión 1', conductor: '', estado: 'alerta',    progreso: 65,  color: '#E24B4A', badge: 'Detenido' },
   { id: '02', nombre: 'Camión 2', conductor: '', estado: 'advertencia', progreso: 40, color: '#BA7517', badge: 'En movimiento' },
   { id: '03', nombre: 'Camión 3', conductor: '',  estado: 'ok',         progreso: 100, color: '#639922', badge: 'Completado' },
 ];
 
-// Rutas geográficas reales sobre Suchiapa, Chiapas. Cada array = waypoints [lat, lng]
 const RUTAS_GEO: Record<string, [number, number][]> = {
   '01': [[16.6205, -93.1042], [16.6198, -93.1015], [16.6185, -93.0998], [16.617, -93.0985]],
   '02': [[16.612, -93.108], [16.6135, -93.1055], [16.615, -93.103], [16.6166, -93.1005]],
@@ -130,8 +117,6 @@ function esHoy(fecha: string): boolean {
   const hoy = new Date();
   return d.getFullYear() === hoy.getFullYear() && d.getMonth() === hoy.getMonth() && d.getDate() === hoy.getDate();
 }
-
-// ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const [rutas]        = useState<Ruta[]>(RUTAS_INICIALES);
@@ -161,15 +146,10 @@ export default function Dashboard() {
     puntos: Array<[number, number]>;
   }>>([]);
 
-  // Interacción de la leyenda: resaltar al pasar el cursor, encuadrar al pulsar.
   const [rutaResaltadaId, setRutaResaltadaId] = useState<number | null>(null);
   const [rutaEnfocadaId, setRutaEnfocadaId] = useState<number | null>(null);
-  // Cuando tiene valor, en el mapa se muestra SOLO esa ruta y se ocultan las
-  // demás. `null` = se muestran todas.
   const [rutaSoloId, setRutaSoloId] = useState<number | null>(null);
 
-  // Se resuelve aquí y no al cargar las rutas porque la lista de conductores
-  // puede llegar después: así la leyenda se completa sola cuando lo haga.
   const rutasActivasConConductor = useMemo(
     () =>
       rutasActivasMapa.map((ruta) => ({
@@ -180,7 +160,6 @@ export default function Dashboard() {
     [rutasActivasMapa, conductores],
   );
 
-  // Rutas que realmente se dibujan: todas, o solo la seleccionada.
   const rutasParaMapa = useMemo(
     () =>
       rutaSoloId == null
@@ -189,8 +168,6 @@ export default function Dashboard() {
     [rutasActivasConConductor, rutaSoloId],
   );
 
-  // Si la ruta aislada desaparece (se desactiva o deja de estar activa), se
-  // vuelve a mostrar todo para no dejar el mapa vacío sin explicación.
   useEffect(() => {
     if (rutaSoloId != null && !rutasActivasConConductor.some((r) => r.ruta_id === rutaSoloId)) {
       setRutaSoloId(null);
@@ -207,13 +184,8 @@ export default function Dashboard() {
   useEffect(() => {
     async function cargarRutasActivasMapa() {
       try {
-        // Via gin-backend, igual que el resto: reenvia a api_rutas y aporta
-        // la autenticacion que api_rutas no valida por su cuenta.
         type JsonRuta = {
           puntos?: Array<{ lat: number; lng: number; nombre?: string; orden?: number }>;
-          // El AG guarda aquí la traza que sigue las calles reales del grafo
-          // OSM, como pares [lat, lng]. Sin ella solo tenemos los puntos de
-          // recolección, que unidos dan líneas rectas a través de las manzanas.
           ruta_optimizada_coords?: Array<[number, number]>;
         };
         type RutaActiva = {
@@ -238,9 +210,6 @@ export default function Dashboard() {
                 ? trazaAG.map((c) => [c[0], c[1]])
                 : (jsonRuta?.puntos || []).map((p) => [p.lat, p.lng]);
 
-            // Las paradas van aparte de la traza: la linea la dibuja el
-            // recorrido del AG, y los numeros corresponden a los puntos de
-            // recoleccion en su orden de visita.
             const paradas = (jsonRuta?.puntos || []).map((p, i) => ({
               orden: p.orden ?? i + 1,
               lat: p.lat,
@@ -266,8 +235,8 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    async function loadAnomalias() {
-      setLoadingAnomalias(true);
+    async function loadAnomalias({ silencioso = false } = {}) {
+      if (!silencioso) setLoadingAnomalias(true);
       setErrorAnomalias(null);
 
       try {
@@ -281,6 +250,9 @@ export default function Dashboard() {
     }
 
     void loadAnomalias();
+    const recargar = () => void loadAnomalias({ silencioso: true });
+    window.addEventListener(EVENTO_ANOMALIAS_ACTUALIZADAS, recargar);
+    return () => window.removeEventListener(EVENTO_ANOMALIAS_ACTUALIZADAS, recargar);
   }, []);
 
   useEffect(() => {
@@ -311,8 +283,6 @@ export default function Dashboard() {
         setRutasFiltro(rutasRes.data ?? []);
         setRutaCamionLinks(links ?? []);
       } catch {
-        // El filtro por ruta y el conteo de rutas activas son complementos:
-        // si falla, esas secciones simplemente se quedan sin datos.
       }
     }
 
@@ -325,8 +295,6 @@ export default function Dashboard() {
         const response = await apiRequest<{ data: AsignacionActiva[] }>('/api/historial-asignacion/');
         setAsignacionesActivas((response.data ?? []).filter(a => !a.fecha_baja));
       } catch {
-        // Complemento del panel de camiones: si falla, simplemente no se
-        // muestra el conductor asignado.
       }
     }
 
@@ -341,8 +309,6 @@ export default function Dashboard() {
           }));
         setConductores(soloConductores);
       } catch {
-        // /api/empleados/ requiere rol ADMIN (ver Historial.tsx). Si la
-        // cuenta logueada no lo es, se omite el nombre del conductor.
       }
     }
 
@@ -356,7 +322,6 @@ export default function Dashboard() {
         const vaciadosRes = await apiRequest<RegistroVaciadoDashboard[] | null>('/api/registro-vaciado/');
         setVaciados(vaciadosRes ?? []);
       } catch {
-        // Complemento de la métrica "Vaciados hoy": si falla, se queda en 0.
       }
     }
 
@@ -401,8 +366,6 @@ export default function Dashboard() {
     estadoIcono: ESTADO_ICONO[r.estado] ?? 'activo',
     ruta: RUTAS_GEO[r.id] ?? [],
   }));
-
- // SOLO cambia la parte del render (return)
 
 return (
   <div className="dash-container">

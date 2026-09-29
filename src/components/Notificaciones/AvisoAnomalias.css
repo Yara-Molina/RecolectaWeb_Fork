@@ -1,0 +1,83 @@
+.aviso-anomalias {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, calc(100vw - 32px));
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+.aviso-anomalias-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #ffffff;
+  border-left: 4px solid #E88D1D;
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 24px rgba(15, 103, 108, 0.18);
+  color: #1a3a2f;
+  animation: aviso-anomalias-entrada 0.25s ease-out;
+}
+
+.aviso-anomalias-icono {
+  flex-shrink: 0;
+  margin-top: 2px;
+  font-size: 1.2rem;
+  color: #E88D1D;
+}
+
+.aviso-anomalias-texto {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+
+.aviso-anomalias-texto span {
+  color: #5a6e60;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.aviso-anomalias-ver {
+  align-self: flex-start;
+  margin-top: 4px;
+  background: #0F676C;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.aviso-anomalias-cerrar {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: #5a6e60;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+@keyframes aviso-anomalias-entrada {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

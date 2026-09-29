@@ -1,8 +1,8 @@
-// pages/Anomalias/Anomalias.tsx
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import './Anomalias.css';
-import { apiRequest, ApiError } from '../../services/api';
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import "./Anomalias.css";
+import { apiRequest, ApiError } from "../../services/api";
+import { EVENTO_ANOMALIAS_ACTUALIZADAS } from "../../components/Notificaciones/AvisoAnomalias";
 import {
   FiAlertTriangle,
   FiCheckCircle,
@@ -18,18 +18,12 @@ import {
   FiAlertCircle,
   FiChevronLeft,
   FiChevronRight,
-} from 'react-icons/fi';
+} from "react-icons/fi";
 
 const ITEMS_POR_PAGINA = 10;
 
-// Estados reales que maneja el backend (src/Fallas/domain/entities/anomalia.go)
-type EstadoAnomalia = 'PENDIENTE' | 'EN_PROCESO' | 'RESUELTA';
+type EstadoAnomalia = "PENDIENTE" | "EN_PROCESO" | "RESUELTA";
 
-// Tal como responde GET/POST/PUT /api/anomalias/
-// (src/Fallas/domain/entities/anomalia.go). OJO: el campo es "conductor_id",
-// no "id_chofer_id" -- con el nombre viejo el PUT nunca mandaba este dato,
-// y como el UPDATE del backend reemplaza la columna completa, cada guardado
-// desde esta pantalla borraba el conductor_id real de la anomalía.
 interface Anomalia {
   anomalia_id: number;
   punto_id: number | null;
@@ -39,8 +33,6 @@ interface Anomalia {
   estado: EstadoAnomalia;
   fecha_resolucion: string | null;
   conductor_id: number | null;
-  // Resultado del pipeline modelo_reportes -> clasificador_reportes,
-  // se llena solo (async) al crear la anomalía.
   estado_pipeline?: string;
   nivel_riesgo?: string | null;
   categoria_clasificada?: string | null;
@@ -61,8 +53,9 @@ interface AnomaliaPayload {
 
 function mensajeError(err: unknown, fallback: string): string {
   if (err instanceof ApiError) {
-    if (err.status === 401) return 'Tu sesión expiró. Vuelve a iniciar sesión.';
-    if (err.status === 403) return 'No tienes permisos para realizar esta acción.';
+    if (err.status === 401) return "Tu sesión expiró. Vuelve a iniciar sesión.";
+    if (err.status === 403)
+      return "No tienes permisos para realizar esta acción.";
     return err.message || fallback;
   }
   return err instanceof Error ? err.message : fallback;
@@ -77,23 +70,27 @@ export default function Anomalias() {
   const [saving, setSaving] = useState(false);
 
   const [mostrarModal, setMostrarModal] = useState(false);
-  const [selectedAnomalia, setSelectedAnomalia] = useState<Anomalia | null>(null);
-  const [modalEstado, setModalEstado] = useState<EstadoAnomalia>('PENDIENTE');
+  const [selectedAnomalia, setSelectedAnomalia] = useState<Anomalia | null>(
+    null,
+  );
+  const [modalEstado, setModalEstado] = useState<EstadoAnomalia>("PENDIENTE");
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedEstado, setSelectedEstado] = useState('todos');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedEstado, setSelectedEstado] = useState("todos");
   const [pagina, setPagina] = useState(1);
 
-  async function loadAnomalias() {
-    setLoading(true);
+  async function loadAnomalias({ silencioso = false } = {}) {
+    if (!silencioso) setLoading(true);
     setError(null);
 
     try {
-      const response = await apiRequest<{ data: Anomalia[] }>('/api/anomalias/');
+      const response = await apiRequest<{ data: Anomalia[] }>(
+        "/api/anomalias/",
+      );
       setAnomalias(response.data ?? []);
     } catch (err) {
-      setError(mensajeError(err, 'No se pudieron cargar las anomalías.'));
-      if (err instanceof ApiError && err.status === 401) navigate('/login');
+      setError(mensajeError(err, "No se pudieron cargar las anomalías."));
+      if (err instanceof ApiError && err.status === 401) navigate("/login");
     } finally {
       setLoading(false);
     }
@@ -101,23 +98,27 @@ export default function Anomalias() {
 
   useEffect(() => {
     void loadAnomalias();
+    const recargar = () => void loadAnomalias({ silencioso: true });
+    window.addEventListener(EVENTO_ANOMALIAS_ACTUALIZADAS, recargar);
+    return () =>
+      window.removeEventListener(EVENTO_ANOMALIAS_ACTUALIZADAS, recargar);
   }, []);
 
   const estadisticas = useMemo(
     () => ({
       total: anomalias.length,
-      pendientes: anomalias.filter((a) => a.estado === 'PENDIENTE').length,
-      enProceso: anomalias.filter((a) => a.estado === 'EN_PROCESO').length,
-      resueltas: anomalias.filter((a) => a.estado === 'RESUELTA').length,
+      pendientes: anomalias.filter((a) => a.estado === "PENDIENTE").length,
+      enProceso: anomalias.filter((a) => a.estado === "EN_PROCESO").length,
+      resueltas: anomalias.filter((a) => a.estado === "RESUELTA").length,
     }),
-    [anomalias]
+    [anomalias],
   );
 
   const getEstadoIcon = (estado: string) => {
     switch (estado) {
-      case 'RESUELTA':
+      case "RESUELTA":
         return <FiCheckCircle />;
-      case 'EN_PROCESO':
+      case "EN_PROCESO":
         return <FiClock />;
       default:
         return <FiAlertCircle />;
@@ -125,17 +126,28 @@ export default function Anomalias() {
   };
 
   const getEstadoLabel = (estado: string) =>
-    estado === 'RESUELTA' ? 'Resuelta' : estado === 'EN_PROCESO' ? 'En proceso' : 'Pendiente';
+    estado === "RESUELTA"
+      ? "Resuelta"
+      : estado === "EN_PROCESO"
+        ? "En proceso"
+        : "Pendiente";
 
   const formatFecha = (fecha: string | null) => {
-    if (!fecha) return '—';
+    if (!fecha) return "—";
     const d = new Date(fecha);
     if (Number.isNaN(d.getTime())) return fecha;
-    return d.toLocaleString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleString("es-MX", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   const anomaliasFiltradas = anomalias.filter((item) => {
-    if (selectedEstado !== 'todos' && item.estado !== selectedEstado) return false;
+    if (selectedEstado !== "todos" && item.estado !== selectedEstado)
+      return false;
     if (
       searchTerm &&
       !item.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) &&
@@ -145,7 +157,10 @@ export default function Anomalias() {
     return true;
   });
 
-  const totalPaginas = Math.max(1, Math.ceil(anomaliasFiltradas.length / ITEMS_POR_PAGINA));
+  const totalPaginas = Math.max(
+    1,
+    Math.ceil(anomaliasFiltradas.length / ITEMS_POR_PAGINA),
+  );
   const paginaActual = Math.min(pagina, totalPaginas);
   const anomaliasPagina = anomaliasFiltradas.slice(
     (paginaActual - 1) * ITEMS_POR_PAGINA,
@@ -174,21 +189,22 @@ export default function Anomalias() {
       descripcion: selectedAnomalia.descripcion,
       fecha_reporte: selectedAnomalia.fecha_reporte,
       estado: modalEstado,
-      fecha_resolucion: modalEstado === 'RESUELTA' ? new Date().toISOString() : null,
+      fecha_resolucion:
+        modalEstado === "RESUELTA" ? new Date().toISOString() : null,
       conductor_id: selectedAnomalia.conductor_id,
     };
 
     try {
       await apiRequest(`/api/anomalias/${selectedAnomalia.anomalia_id}`, {
-        method: 'PUT',
+        method: "PUT",
         body: JSON.stringify(payload),
       });
 
       setMostrarModal(false);
       await loadAnomalias();
     } catch (err) {
-      setError(mensajeError(err, 'No se pudo actualizar la anomalía.'));
-      if (err instanceof ApiError && err.status === 401) navigate('/login');
+      setError(mensajeError(err, "No se pudo actualizar la anomalía."));
+      if (err instanceof ApiError && err.status === 401) navigate("/login");
     } finally {
       setSaving(false);
     }
@@ -201,7 +217,9 @@ export default function Anomalias() {
           <div className="anomalias header-content">
             <div className="anomalias header-title">
               <h1>Gestión de Anomalías</h1>
-              <p className="anomalias subtitle">Reportes y seguimiento de incidentes en puntos de recolección</p>
+              <p className="anomalias subtitle">
+                Reportes y seguimiento de incidentes en puntos de recolección
+              </p>
             </div>
 
             <div className="anomalias stats-container">
@@ -210,8 +228,12 @@ export default function Anomalias() {
                   <FiAlertTriangle />
                 </div>
                 <div>
-                  <span className="anomalias stat-value">{estadisticas.total}</span>
-                  <span className="anomalias stat-label">Anomalías totales</span>
+                  <span className="anomalias stat-value">
+                    {estadisticas.total}
+                  </span>
+                  <span className="anomalias stat-label">
+                    Anomalías totales
+                  </span>
                 </div>
               </div>
 
@@ -220,7 +242,9 @@ export default function Anomalias() {
                   <FiAlertCircle />
                 </div>
                 <div>
-                  <span className="anomalias stat-value">{estadisticas.pendientes}</span>
+                  <span className="anomalias stat-value">
+                    {estadisticas.pendientes}
+                  </span>
                   <span className="anomalias stat-label">Pendientes</span>
                 </div>
               </div>
@@ -230,7 +254,9 @@ export default function Anomalias() {
                   <FiClock />
                 </div>
                 <div>
-                  <span className="anomalias stat-value">{estadisticas.enProceso}</span>
+                  <span className="anomalias stat-value">
+                    {estadisticas.enProceso}
+                  </span>
                   <span className="anomalias stat-label">En proceso</span>
                 </div>
               </div>
@@ -240,7 +266,9 @@ export default function Anomalias() {
                   <FiCheckCircle />
                 </div>
                 <div>
-                  <span className="anomalias stat-value">{estadisticas.resueltas}</span>
+                  <span className="anomalias stat-value">
+                    {estadisticas.resueltas}
+                  </span>
                   <span className="anomalias stat-label">Resueltas</span>
                 </div>
               </div>
@@ -281,7 +309,10 @@ export default function Anomalias() {
         </div>
 
         {error && (
-          <div className="anomalias controls-container" style={{ color: '#e74c3c', padding: '8px 16px' }}>
+          <div
+            className="anomalias controls-container"
+            style={{ color: "#e74c3c", padding: "8px 16px" }}
+          >
             {error}
           </div>
         )}
@@ -289,13 +320,16 @@ export default function Anomalias() {
         <div className="anomalias table-container">
           <div className="anomalias table-header">
             <div className="anomalias table-summary">
-              Mostrando {anomaliasFiltradas.length} de {anomalias.length} anomalías
+              Mostrando {anomaliasFiltradas.length} de {anomalias.length}{" "}
+              anomalías
             </div>
           </div>
 
           <div className="anomalias table-wrapper">
             {loading ? (
-              <div style={{ padding: 24, textAlign: 'center' }}>Cargando anomalías...</div>
+              <div style={{ padding: 24, textAlign: "center" }}>
+                Cargando anomalías...
+              </div>
             ) : (
               <table className="anomalias anomalias-table">
                 <thead>
@@ -310,29 +344,45 @@ export default function Anomalias() {
                 <tbody>
                   {anomaliasFiltradas.length === 0 ? (
                     <tr>
-                      <td colSpan={5} style={{ textAlign: 'center', padding: 24 }}>
+                      <td
+                        colSpan={5}
+                        style={{ textAlign: "center", padding: 24 }}
+                      >
                         No hay anomalías para mostrar.
                       </td>
                     </tr>
                   ) : (
                     anomaliasPagina.map((item) => (
-                      <tr key={item.anomalia_id} className="anomalias table-row">
-                        <td>#{item.anomalia_id}{item.punto_id ? ` · Punto ${item.punto_id}` : ''}</td>
+                      <tr
+                        key={item.anomalia_id}
+                        className="anomalias table-row"
+                      >
+                        <td>
+                          #{item.anomalia_id}
+                          {item.punto_id ? ` · Punto ${item.punto_id}` : ""}
+                        </td>
                         <td>
                           <div className="anomalias descripcion">
-                            <b style={{ textTransform: 'capitalize' }}>{item.tipo_anomalia}</b>
+                            <b style={{ textTransform: "capitalize" }}>
+                              {item.tipo_anomalia}
+                            </b>
                             <div>{item.descripcion}</div>
                           </div>
                         </td>
                         <td>{formatFecha(item.fecha_reporte)}</td>
                         <td>
-                          <div className={`anomalias estado-badge anomalias estado-${item.estado.toLowerCase()}`}>
+                          <div
+                            className={`anomalias estado-badge anomalias estado-${item.estado.toLowerCase()}`}
+                          >
                             {getEstadoIcon(item.estado)}
                             <span>{getEstadoLabel(item.estado)}</span>
                           </div>
                         </td>
                         <td>
-                          <button className="anomalias btn-detalles" onClick={() => handleOpenModal(item)}>
+                          <button
+                            className="anomalias btn-detalles"
+                            onClick={() => handleOpenModal(item)}
+                          >
                             <FiEye />
                             <span>Ver</span>
                           </button>
@@ -375,14 +425,19 @@ export default function Anomalias() {
         </div>
 
         {/* Modal de detalle / cambio de estado */}
-        <div className={`anomalias modal-overlay ${mostrarModal ? 'show' : ''}`}>
+        <div
+          className={`anomalias modal-overlay ${mostrarModal ? "show" : ""}`}
+        >
           <div className="anomalias modal" onClick={(e) => e.stopPropagation()}>
             <div className="anomalias modal-header">
               <h2 className="anomalias modal-title">
                 <FiAlertTriangle />
                 <span>Detalles de Anomalía</span>
               </h2>
-              <button className="anomalias modal-close" onClick={() => setMostrarModal(false)}>
+              <button
+                className="anomalias modal-close"
+                onClick={() => setMostrarModal(false)}
+              >
                 <FiX />
               </button>
             </div>
@@ -395,7 +450,9 @@ export default function Anomalias() {
                       <FiMapPin />
                       <span>Punto:</span>
                     </div>
-                    <div>{selectedAnomalia.punto_id ?? 'Sin punto asociado'}</div>
+                    <div>
+                      {selectedAnomalia.punto_id ?? "Sin punto asociado"}
+                    </div>
                   </div>
 
                   <div>
@@ -420,53 +477,92 @@ export default function Anomalias() {
                     <FiFileText />
                     <span>Descripción</span>
                   </label>
-                  <div className="anomalias modal-textarea" style={{ minHeight: 60 }}>
+                  <div
+                    className="anomalias modal-textarea"
+                    style={{ minHeight: 60 }}
+                  >
                     {selectedAnomalia.descripcion}
                   </div>
                 </div>
 
                 {selectedAnomalia.estado_pipeline && (
                   <div className="anomalias modal-section">
-                    <label className="anomalias modal-label">Clasificación automática</label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 13 }}>
-                      <span style={{ padding: '4px 10px', borderRadius: 12, background: '#f1f2f6' }}>
+                    <label className="anomalias modal-label">
+                      Clasificación automática
+                    </label>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 8,
+                        fontSize: 13,
+                      }}
+                    >
+                      <span
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 12,
+                          background: "#f1f2f6",
+                        }}
+                      >
                         Pipeline: {selectedAnomalia.estado_pipeline}
                       </span>
                       {selectedAnomalia.nivel_riesgo && (
                         <span
                           style={{
-                            padding: '4px 10px',
+                            padding: "4px 10px",
                             borderRadius: 12,
                             background:
-                              selectedAnomalia.nivel_riesgo === 'alto'
-                                ? '#fdecea'
-                                : selectedAnomalia.nivel_riesgo === 'medio'
-                                ? '#fff4e0'
-                                : '#eafaf1',
+                              selectedAnomalia.nivel_riesgo === "alto"
+                                ? "#fdecea"
+                                : selectedAnomalia.nivel_riesgo === "medio"
+                                  ? "#fff4e0"
+                                  : "#eafaf1",
                             color:
-                              selectedAnomalia.nivel_riesgo === 'alto'
-                                ? '#e74c3c'
-                                : selectedAnomalia.nivel_riesgo === 'medio'
-                                ? '#c78a1e'
-                                : '#27ae60',
+                              selectedAnomalia.nivel_riesgo === "alto"
+                                ? "#e74c3c"
+                                : selectedAnomalia.nivel_riesgo === "medio"
+                                  ? "#c78a1e"
+                                  : "#27ae60",
                           }}
                         >
                           Riesgo: {selectedAnomalia.nivel_riesgo}
                         </span>
                       )}
                       {selectedAnomalia.categoria_clasificada && (
-                        <span style={{ padding: '4px 10px', borderRadius: 12, background: '#f1f2f6' }}>
+                        <span
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: 12,
+                            background: "#f1f2f6",
+                          }}
+                        >
                           Categoría: {selectedAnomalia.categoria_clasificada}
-                          {selectedAnomalia.subtipo_clasificado ? ` / ${selectedAnomalia.subtipo_clasificado}` : ''}
+                          {selectedAnomalia.subtipo_clasificado
+                            ? ` / ${selectedAnomalia.subtipo_clasificado}`
+                            : ""}
                         </span>
                       )}
                       {selectedAnomalia.accion_sugerida && (
-                        <span style={{ padding: '4px 10px', borderRadius: 12, background: '#f1f2f6' }}>
+                        <span
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: 12,
+                            background: "#f1f2f6",
+                          }}
+                        >
                           Acción sugerida: {selectedAnomalia.accion_sugerida}
                         </span>
                       )}
                       {selectedAnomalia.pipeline_error && (
-                        <span style={{ padding: '4px 10px', borderRadius: 12, background: '#fdecea', color: '#e74c3c' }}>
+                        <span
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: 12,
+                            background: "#fdecea",
+                            color: "#e74c3c",
+                          }}
+                        >
                           Error: {selectedAnomalia.pipeline_error}
                         </span>
                       )}
@@ -475,11 +571,15 @@ export default function Anomalias() {
                 )}
 
                 <div className="anomalias modal-section">
-                  <label className="anomalias modal-label">Actualizar estado</label>
+                  <label className="anomalias modal-label">
+                    Actualizar estado
+                  </label>
                   <select
                     className="anomalias modal-select"
                     value={modalEstado}
-                    onChange={(e) => setModalEstado(e.target.value as EstadoAnomalia)}
+                    onChange={(e) =>
+                      setModalEstado(e.target.value as EstadoAnomalia)
+                    }
                   >
                     <option value="PENDIENTE">Pendiente</option>
                     <option value="EN_PROCESO">En proceso</option>
@@ -495,16 +595,19 @@ export default function Anomalias() {
                     <FiX />
                     <span>Cancelar</span>
                   </button>
-                  <button className="anomalias modal-btn anomalias modal-btn-primary" onClick={handleGuardarEstado} disabled={saving}>
+                  <button
+                    className="anomalias modal-btn anomalias modal-btn-primary"
+                    onClick={handleGuardarEstado}
+                    disabled={saving}
+                  >
                     <FiSave />
-                    <span>{saving ? 'Guardando...' : 'Guardar'}</span>
+                    <span>{saving ? "Guardando..." : "Guardar"}</span>
                   </button>
                 </div>
               </>
             )}
           </div>
         </div>
-
       </div>
     </div>
   );
