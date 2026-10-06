@@ -1,10 +1,11 @@
-// Login.jsx o Login.tsx
 import { useState } from 'react';
 import './Login.css';
 import Logo from '../../assets/Logo.png';
 import { useNavigate } from 'react-router-dom';
 import { FiEye, FiEyeOff } from 'react-icons/fi';
-import { apiRequest, setToken, setRole, setUserName } from '../../services/api';
+import { ApiError, apiRequest, setToken, setRole, setUserName } from '../../services/api';
+import AlertaError from '../../components/Notificaciones/AlertaError';
+import { errorLegible, type ErrorLegible } from '../../components/Notificaciones/errorLegible';
 
 interface LoginResponse {
   token?: string;
@@ -21,7 +22,7 @@ export default function Login() {
   const [emailOrAlias, setEmailOrAlias] = useState('');
   const [contrasena, setContrasena] = useState('');
   const [mostrarContrasena, setMostrarContrasena] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorLegible | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -52,7 +53,15 @@ export default function Login() {
 
       navigate('/dashboard');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Credenciales incorrectas.');
+      if (err instanceof ApiError && err.status === 401) {
+        setError({
+          titulo: 'No se pudo iniciar sesión',
+          mensaje: 'El correo, usuario o contraseña no son correctos.',
+          tipo: 'usuario',
+        });
+      } else {
+        setError(errorLegible(err, 'No se pudo iniciar sesión'));
+      }
     } finally {
       setLoading(false);
     }
@@ -66,11 +75,7 @@ export default function Login() {
           <h1 className="login-title">BIENVENIDO</h1>
           
           <form className="login-form" onSubmit={handleSubmit}>
-            {error && (
-              <div className="login-error" style={{ color: 'red', marginBottom: '1rem', fontSize: '0.9rem' }}>
-                {error}
-              </div>
-            )}
+            {error && <AlertaError error={error} onCerrar={() => setError(null)} />}
 
             <div className="input-group">
               <label htmlFor="nombre">Correo o usuario</label>

@@ -123,7 +123,7 @@
 .ec-en_ruta .ec-stat-icon { background: var(--success); }
 .ec-pausa .ec-stat-icon { background: var(--warning); }
 .ec-en_base .ec-stat-icon { background: var(--primary); }
-.ec-sin_reporte .ec-stat-icon { background: var(--muted); }
+.ec-desconectado .ec-stat-icon { background: var(--muted); }
 
 .ec-error {
   background: rgba(226, 75, 74, 0.1);
@@ -196,10 +196,17 @@
   font-weight: 600;
 }
 
+.ec-motivo {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-light);
+  font-size: 0.75rem;
+}
+
 .ec-badge.ec-en_ruta { background: rgba(99, 153, 34, 0.15); color: var(--success); }
 .ec-badge.ec-pausa { background: rgba(232, 141, 29, 0.15); color: var(--warning); }
 .ec-badge.ec-en_base { background: rgba(15, 103, 108, 0.12); color: var(--primary); }
-.ec-badge.ec-sin_reporte { background: rgba(138, 154, 144, 0.18); color: var(--text-light); }
+.ec-badge.ec-desconectado { background: rgba(138, 154, 144, 0.18); color: var(--text-light); }
 
 .ec-flota {
   color: var(--text-light);
